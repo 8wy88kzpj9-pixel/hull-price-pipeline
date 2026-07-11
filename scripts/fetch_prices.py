@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """Daily fetch — full data layer for all 3 trackers + computed breadth.
-rev 1.2 pipeline. Single provider per series (Yahoo prices/vol, FRED macro).
-Outputs:
-  data/weekly_closes.csv - 28 tickers, W-FRI closes, 70 wk (Hull input)
-  data/vol_indices.csv   - Cboe vol indices, W-FRI, 60 wk (IV + 52wk %ile)
-  data/fred_series.csv   - FRED series, last 80 obs (credit + liquidity)
-  data/breadth.csv       - COMPUTED % of S&P500 above 200/50DMA, W-FRI, 30 wk
-                           (PROXY of $SPXA200R/$SPXA50R - estFlag, verify near thresholds)
-  data/_manifest.csv     - freshness + FAIL audit"""
+rev 1.2 pipeline. Single provider per series (Yahoo prices/vol, FRED macro)."""
 import datetime as dt
+from io import StringIO
 from pathlib import Path
 import pandas as pd
+import requests
 import yfinance as yf
 
 HULL_TICKERS = [
@@ -75,18 +70,19 @@ for sid in FRED:
 pd.DataFrame(fred_out).to_csv(OUT / "fred_series.csv",
                               float_format="%.2f", index_label="date")
 
-# ---- 4) COMPUTED BREADTH: % of S&P500 members above own 200/50 DMA ----
-# PROXY of StockCharts $SPXA200R/$SPXA50R. Constituents from Wikipedia
-# (may lag index changes by a few names). Yahoo adjusted closes.
-# Expect +/-1-3pp vs StockCharts - verify on chart near 20/50/70 thresholds.
+# ---- 4) COMPUTED BREADTH: % of S&P500 above own 200/50 DMA ----
+# PROXY of $SPXA200R/$SPXA50R (estFlag). Wikipedia ปฏิเสธ UA เริ่มต้นของ
+# Python -> ต้อง fetch ด้วย browser User-Agent ก่อนค่อย parse
 try:
     wiki = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    syms = (pd.read_html(wiki)[0]["Symbol"]
+    html = requests.get(wiki, headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=30).text
+    syms = (pd.read_html(StringIO(html))[0]["Symbol"]
             .str.replace(".", "-", regex=False).tolist())
     manifest.append(f"SP500_LIST,OK,{len(syms)},wikipedia")
     px = yf.download(syms, start=start, interval="1d",
                      auto_adjust=True, progress=False)["Close"]
-    px = px.dropna(axis=1, thresh=250)          # ตัดตัวที่ข้อมูลขาดหนัก
+    px = px.dropna(axis=1, thresh=250)
     valid = px.shape[1]
     if valid < 450:
         raise ValueError(f"only {valid} valid tickers")
@@ -95,7 +91,7 @@ try:
     ab200 = (px > ma200).sum(axis=1) / valid * 100
     ab50 = (px > ma50).sum(axis=1) / valid * 100
     br = pd.DataFrame({"pctAbove200dma": ab200, "pctAbove50dma": ab50})
-    br = br[ma200.notna().sum(axis=1) > valid * 0.9]   # รอ MA200 อุ่นเครื่องครบ
+    br = br[ma200.notna().sum(axis=1) > valid * 0.9]
     br = br.resample("W-FRI").last().dropna().tail(30).round(1)
     br.to_csv(OUT / "breadth.csv", index_label="week_ending")
     manifest.append(f"BREADTH,OK,{len(br)},{br.index[-1].date()},valid={valid}")

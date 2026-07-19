@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Daily fetch — full data layer for all 3 trackers + computed breadth.
-rev 1.2 pipeline. Single provider per series (Yahoo prices/vol, FRED macro)."""
+rev 1.2 pipeline. Single provider per series (Yahoo prices/vol, FRED macro).
+v4: adds ^SKEW (vol), ^GSPC + ^SET.BK (hull/market), DTWEXBGS (FRED dollar)."""
 import datetime as dt
 from io import StringIO
 from pathlib import Path
@@ -13,9 +14,11 @@ HULL_TICKERS = [
     "SOXX","XLK","GLD","GLTR","HYG","LQD","BTC-USD",
     "EWJ","VGK","IWM","IWF","IWD",
     "XLC","XLF","XLV","XLU","XLRE","XLE","XLB","XLY",
+    "^GSPC","^SET.BK",
 ]
-VOL_TICKERS = ["^VIX","^VXN","^GVZ","^OVX","^VVIX","^VXEEM","^VXEFA","^RVX"]
-FRED = ["WALCL","WTREGEN","RRPONTSYD","DGS2","DGS10",
+VOL_TICKERS = ["^VIX","^VXN","^GVZ","^OVX","^VVIX","^SKEW",
+               "^VXEEM","^VXEFA","^RVX"]
+FRED = ["WALCL","WTREGEN","RRPONTSYD","DGS2","DGS10","DTWEXBGS",
         "BAMLH0A0HYM2","BAMLC0A0CM"]
 
 OUT = Path(__file__).resolve().parents[1] / "data"
@@ -36,12 +39,12 @@ def pull(t, min_rows):
     return close
 
 def clean(t):
-    return t.replace("-", "").replace("^", "")
+    return t.replace("-", "").replace("^", "").replace(".", "")
 
-# ---- 1) Hull prices ----
+# ---- 1) Hull / market prices ----
 weekly = {}
 for t in HULL_TICKERS:
-    c = pull(t, 300)
+    c = pull(t, 200)
     if c is not None:
         weekly[clean(t)] = c.resample("W-FRI").last().dropna().tail(70)
 pd.DataFrame(weekly).to_csv(OUT / "weekly_closes.csv",
@@ -71,8 +74,6 @@ pd.DataFrame(fred_out).to_csv(OUT / "fred_series.csv",
                               float_format="%.2f", index_label="date")
 
 # ---- 4) COMPUTED BREADTH: % of S&P500 above own 200/50 DMA ----
-# PROXY of $SPXA200R/$SPXA50R (estFlag). Wikipedia ปฏิเสธ UA เริ่มต้นของ
-# Python -> ต้อง fetch ด้วย browser User-Agent ก่อนค่อย parse
 try:
     wiki = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     html = requests.get(wiki, headers={"User-Agent": "Mozilla/5.0"},

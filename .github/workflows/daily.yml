@@ -1,27 +1,46 @@
-name: daily-prices
+name: weekly-prices
 
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # หลังปิดตลาด US ทุกวันทำการ = 05:30 เช้าเวลาไทย
-  workflow_dispatch: {}        # ปุ่มกดรันเองใน Actions
+    - cron: "30 22 * * 1-5"   # หลังปดตลาด US = 05:30 เช้าเวลาไทย
+  workflow_dispatch: {}       # ปุ่มกดรันเองใน Actions
 
 permissions:
   contents: write
 
 jobs:
-  fetch:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install yfinance pandas lxml
-      - run: python scripts/fetch_prices.py
-      - name: commit data
+
+      # pin เวอร์ชัน: yfinance อัปเดตแล้ว schema เปลี่ยนเงียบ = ต้นเหตุที่พัง
+      - name: Install deps
+        run: pip install "yfinance==0.2.66" pandas numpy
+
+      # ถ้าข้อมูลไม่ผ่าน gate จะ exit 1 -> workflow แดง ไม่ commit อะไรเลย
+      - name: Build weekly closes + hull
+        run: python build_weekly.py
+
+      - name: Commit outputs
         run: |
-          git config user.name "price-bot"
+          git config user.name  "price-bot"
           git config user.email "actions@github.com"
-          git add data/
+          git add data/weekly_closes.csv data/hull_weekly.csv data/_status.json
           git diff --cached --quiet || git commit -m "prices $(date -u +%F)"
           git push
+
+      # กันข้อมูลคาง: ถ้าแท่งล่าสุดเก่าเกิน 8 วัน ให้ฟ้องแดง
+      - name: Staleness alarm
+        run: |
+          ASOF=$(python -c "import json;print(json.load(open('data/_status.json'))['asof'])")
+          AGE=$(( ( $(date -u +%s) - $(date -u -d "$ASOF" +%s) ) / 86400 ))
+          echo "asof=$ASOF age=${AGE}d"
+          if [ "$AGE" -gt 8 ]; then
+            echo "::error::STALE DATA — newest bar is ${AGE} days old"
+            exit 1
+          fi

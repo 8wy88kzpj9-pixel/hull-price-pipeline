@@ -37,6 +37,9 @@ USAGE
     pip install "yfinance>=0.2.60" pandas numpy
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
+
+v1.1: SYMBOL_MAP for vendor tickers (BTC-USD/^GSPC/^SET.BK) +
+      Friday week-ending labels to match the seed convention.
 """
 
 import argparse
@@ -61,6 +64,15 @@ NEAR_FLIP_ABS = 0.30
 
 MIN_COVERAGE = 0.90     # latest row must have >=90% of tickers populated
 MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
+
+# Column name in weekly_closes.csv -> yfinance symbol. Column names are the
+# system of record (tracker/TICKER_MAP read them); only the fetch layer needs
+# the vendor spelling. Add here when a fetch returns empty for one ticker.
+SYMBOL_MAP = {
+    "BTCUSD": "BTC-USD",
+    "GSPC": "^GSPC",
+    "SETBK": "^SET.BK",
+}
 
 
 # ------------------------------------------------------------ hull engine ---
@@ -98,13 +110,15 @@ def fetch_weekly(tickers: list) -> pd.DataFrame:
     import yfinance as yf
 
     out = {}
+    ysyms = [SYMBOL_MAP.get(t, t) for t in tickers]
     try:
-        raw = yf.download(" ".join(tickers), period=HISTORY, interval="1wk",
+        raw = yf.download(" ".join(ysyms), period=HISTORY, interval="1wk",
                           auto_adjust=False, group_by="ticker", threads=True,
                           progress=False)
         for t in tickers:
+            sym = SYMBOL_MAP.get(t, t)
             try:
-                col = raw[t]["Close"] if len(tickers) > 1 else raw["Close"]
+                col = raw[sym]["Close"] if len(tickers) > 1 else raw["Close"]
                 if col.notna().sum() >= MIN_ROWS:
                     out[t] = col
             except Exception:
@@ -115,8 +129,8 @@ def fetch_weekly(tickers: list) -> pd.DataFrame:
     missing = [t for t in tickers if t not in out]
     for t in missing:                                   # per-ticker fallback
         try:
-            h = yf.Ticker(t).history(period=HISTORY, interval="1wk",
-                                     auto_adjust=False)["Close"]
+            h = yf.Ticker(SYMBOL_MAP.get(t, t)).history(
+                period=HISTORY, interval="1wk", auto_adjust=False)["Close"]
             if h.notna().sum() >= MIN_ROWS:
                 out[t] = h
             else:
@@ -128,7 +142,15 @@ def fetch_weekly(tickers: list) -> pd.DataFrame:
         sys.exit("FATAL: no ticker returned data — refusing to write anything")
 
     df = pd.DataFrame(out)
-    df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
+    idx = pd.to_datetime(df.index)
+    try:
+        idx = idx.tz_localize(None)
+    except TypeError:
+        idx = idx.tz_convert(None)
+    # yfinance labels a weekly bar with its MONDAY. The seed/WEEKLY_LOG label
+    # weeks by the FRIDAY close. Shift +4 days so date identity matches the
+    # system of record — mismatched labels are how wrong-date errors start.
+    df.index = idx.normalize() + pd.Timedelta(days=4)
     df.index.name = "week_ending"
     return df.sort_index()
 

@@ -1,0 +1,29 @@
+{
+  "asof": "2026-07-20",
+  "coverage": 0.9,
+  "rows": 157,
+  "missing_tickers": [
+    "BTCUSD",
+    "GSPC",
+    "SETBK"
+  ],
+  "run_utc": "2026-07-26T16:03:12+00:00",
+  "hull_nulls": [
+    "BTCUSD",
+    "GSPC",
+    "SETBK"
+  ],
+  "near_flips": [
+    "INDA -0.13",
+    "THD +0.27",
+    "HYG -0.06",
+    "LQD -0.16",
+    "EWJ +0.29",
+    "VGK +0.09",
+    "IWF +0.23",
+    "XLU +0.06",
+    "XLE -0.05",
+    "XLB -0.03",
+    "XLY -0.23"
+  ]
+}

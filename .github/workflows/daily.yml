@@ -2,8 +2,8 @@ name: weekly-prices
 
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # หลังปดตลาด US = 05:30 เช้าเวลาไทย
-  workflow_dispatch: {}       # ปุ่มกดรันเองใน Actions
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -18,29 +18,61 @@ jobs:
         with:
           python-version: "3.12"
 
-      # pin เวอร์ชัน: yfinance อัปเดตแล้ว schema เปลี่ยนเงียบ = ต้นเหตุที่พัง
       - name: Install deps
-        run: pip install "yfinance==0.2.66" pandas numpy
+        run: pip install "yfinance==0.2.66" pandas numpy requests lxml html5lib
 
-      # ถ้าข้อมูลไม่ผ่าน gate จะ exit 1 -> workflow แดง ไม่ commit อะไรเลย
       - name: Build weekly closes + hull
         run: python build_weekly.py
 
+      - name: Build macro series
+        id: macro
+        run: python build_macro.py
+
       - name: Commit outputs
+        if: always()
         run: |
           git config user.name  "price-bot"
           git config user.email "actions@github.com"
-          git add data/weekly_closes.csv data/hull_weekly.csv data/_status.json
-          git diff --cached --quiet || git commit -m "prices $(date -u +%F)"
+          git add data/weekly_closes.csv data/hull_weekly.csv data/_status.json \
+                  data/macro_daily.csv data/macro_weekly.csv data/_macro_status.json \
+                  data/sp500_members.csv 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "prices+macro $(date -u +%F)"
+          git pull --rebase origin main
           git push
 
-      # กันข้อมูลคาง: ถ้าแท่งล่าสุดเก่าเกิน 8 วัน ให้ฟ้องแดง
       - name: Staleness alarm
         run: |
-          ASOF=$(python -c "import json;print(json.load(open('data/_status.json'))['asof'])")
-          AGE=$(( ( $(date -u +%s) - $(date -u -d "$ASOF" +%s) ) / 86400 ))
-          echo "asof=$ASOF age=${AGE}d"
-          if [ "$AGE" -gt 8 ]; then
-            echo "::error::STALE DATA — newest bar is ${AGE} days old"
-            exit 1
-          fi
+          python - <<'PY'
+          import json, sys
+          from datetime import datetime, timezone
+
+          fail = []
+
+          st = json.load(open("data/_status.json"))
+          age = (datetime.now(timezone.utc).date()
+                 - datetime.strptime(st["asof"], "%Y-%m-%d").date()).days
+          print(f"prices  asof={st['asof']} age={age}d coverage={st['coverage']:.0%}")
+          if age > 8:
+              fail.append(f"prices stale {age}d")
+
+          try:
+              ms = json.load(open("data/_macro_status.json"))
+              print(f"macro   series_ok={ms['series_ok']}/{ms['series_total']} "
+                    f"latest_friday={ms['latest_friday']} stale={ms['stale_series']}")
+              b = ms.get("breadth", {})
+              print(f"breadth status={b.get('status')} asof={b.get('asof')} "
+                    f"universe={b.get('universe')} "
+                    f"200dma={b.get('pct_above_200dma')} 50dma={b.get('pct_above_50dma')}")
+              if b.get("hysteresis_warning"):
+                  print("::warning::breadth within 3pt of a threshold — chart-verify")
+              if ms["failed"]:
+                  fail.append(f"macro series failed: {ms['failed']}")
+              if b.get("status") == "failed":
+                  fail.append("breadth computation failed")
+          except FileNotFoundError:
+              fail.append("macro status file missing (build_macro.py did not run)")
+
+          for f in fail:
+              print(f"::error::{f}")
+          sys.exit(1 if fail else 0)
+          PY

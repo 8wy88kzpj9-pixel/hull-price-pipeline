@@ -38,6 +38,7 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.2: chunked fetch + backoff + per-ticker sweep (Yahoo rate-limit resilience).
 v1.1: SYMBOL_MAP for vendor tickers (BTC-USD/^GSPC/^SET.BK) +
       Friday week-ending labels to match the seed convention.
 """
@@ -63,6 +64,10 @@ HMA_PERIOD = 55
 NEAR_FLIP_ABS = 0.30
 
 MIN_COVERAGE = 0.90     # latest row must have >=90% of tickers populated
+CHUNK = 6               # symbols per request — large batches trip Yahoo's limiter
+PAUSE = 1.5             # seconds between requests
+RETRIES = 3             # batch passes before falling back to one-by-one
+BACKOFF = 20            # base seconds between retry passes (doubles each time)
 MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
 
 # Column name in weekly_closes.csv -> yfinance symbol. Column names are the
@@ -104,39 +109,65 @@ def hull_row(series: pd.Series):
 
 # ------------------------------------------------------------- download -----
 def fetch_weekly(tickers: list) -> pd.DataFrame:
-    """Weekly closes for all tickers. Batch first; per-ticker retry for any
-    column that comes back empty (batch mode fails silently far too often —
-    that is precisely how this pipeline broke)."""
+    """Weekly closes for all tickers.
+
+    Yahoo rate-limits bursty requests: a single 30-symbol batch can come back
+    empty for every equity while crypto still resolves (observed 2026-07-10 and
+    again 2026-07-27 — the exact signature that took this pipeline down). So:
+    small chunks, backoff between them, then a slow per-ticker sweep for anything
+    still missing. Slower by design; a run that takes 90s and succeeds beats one
+    that takes 8s and returns nothing."""
+    import time
     import yfinance as yf
 
     out = {}
-    ysyms = [SYMBOL_MAP.get(t, t) for t in tickers]
-    try:
-        raw = yf.download(" ".join(ysyms), period=HISTORY, interval="1wk",
-                          auto_adjust=False, group_by="ticker", threads=True,
-                          progress=False)
-        for t in tickers:
-            sym = SYMBOL_MAP.get(t, t)
-            try:
-                col = raw[sym]["Close"] if len(tickers) > 1 else raw["Close"]
-                if col.notna().sum() >= MIN_ROWS:
-                    out[t] = col
-            except Exception:
-                pass
-    except Exception as e:
-        print(f"WARN batch download failed: {e}", file=sys.stderr)
 
-    missing = [t for t in tickers if t not in out]
-    for t in missing:                                   # per-ticker fallback
+    def keep(t, col):
+        if col is not None and col.notna().sum() >= MIN_ROWS:
+            out[t] = col
+            return True
+        return False
+
+    # ---- pass 1: chunked batches with backoff ----
+    for attempt in range(RETRIES):
+        pending = [t for t in tickers if t not in out]
+        if not pending:
+            break
+        if attempt:
+            wait = BACKOFF * (2 ** (attempt - 1))
+            print(f"  retry {attempt}: {len(pending)} missing, waiting {wait}s")
+            time.sleep(wait)
+        for i in range(0, len(pending), CHUNK):
+            grp = pending[i:i + CHUNK]
+            syms = [SYMBOL_MAP.get(t, t) for t in grp]
+            try:
+                raw = yf.download(" ".join(syms), period=HISTORY, interval="1wk",
+                                  auto_adjust=False, group_by="ticker",
+                                  threads=False, progress=False)
+                for t in grp:
+                    sym = SYMBOL_MAP.get(t, t)
+                    try:
+                        col = raw[sym]["Close"] if len(grp) > 1 else raw["Close"]
+                        keep(t, col)
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"  chunk {grp[0]}..{grp[-1]} failed: {str(e)[:90]}",
+                      file=sys.stderr)
+            time.sleep(PAUSE)
+
+    # ---- pass 2: per-ticker sweep for stragglers ----
+    for t in [t for t in tickers if t not in out]:
         try:
             h = yf.Ticker(SYMBOL_MAP.get(t, t)).history(
                 period=HISTORY, interval="1wk", auto_adjust=False)["Close"]
-            if h.notna().sum() >= MIN_ROWS:
-                out[t] = h
-            else:
+            if not keep(t, h):
                 print(f"WARN {t}: only {h.notna().sum()} rows", file=sys.stderr)
         except Exception as e:
-            print(f"WARN {t} retry failed: {e}", file=sys.stderr)
+            print(f"WARN {t} single fetch failed: {str(e)[:90]}", file=sys.stderr)
+        time.sleep(PAUSE)
+
+    print(f"  fetched {len(out)}/{len(tickers)} tickers")
 
     if not out:
         sys.exit("FATAL: no ticker returned data — refusing to write anything")

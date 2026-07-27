@@ -64,6 +64,7 @@ import argparse
 import io
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -75,8 +76,14 @@ DAILY = DATA / "macro_daily.csv"
 WEEKLY = DATA / "macro_weekly.csv"
 STATUS = DATA / "_macro_status.json"
 
+# Two endpoints: the CSV graph export is much lighter than the full .txt history
+# (observed .txt read-timeouts from GitHub runners on 2026-07-28) so it is tried
+# first; the .txt table is kept as the fallback because it is the canonical form.
+FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
 FRED_TXT = "https://fred.stlouisfed.org/data/{sid}.txt"
-TIMEOUT = 30
+TIMEOUT = 45            # runners are slower than a laptop; 30s was not enough
+RETRIES = 2             # 2 attempts x 2 endpoints; worst case ~3min per series
+BACKOFF = 5             # seconds, doubles per attempt
 UA = {"User-Agent": "Mozilla/5.0 (compatible; macro-pipeline/1.0)"}
 
 # series id -> (column name, max acceptable staleness in days)
@@ -109,11 +116,9 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def fetch_series(sid: str) -> pd.Series:
-    """FRED /data/<ID>.txt = header lines, then 'DATE VALUE' rows. '.' means no obs."""
-    r = requests.get(FRED_TXT.format(sid=sid), headers=UA, timeout=TIMEOUT)
-    r.raise_for_status()
-    lines = r.text.splitlines()
+def _parse_txt(text: str) -> pd.Series:
+    """FRED /data/<ID>.txt = header lines, then 'DATE VALUE' rows. '.' = no obs."""
+    lines = text.splitlines()
     start = None
     for i, ln in enumerate(lines):
         parts = ln.split()
@@ -121,17 +126,43 @@ def fetch_series(sid: str) -> pd.Series:
             start = i
             break
     if start is None:
-        raise RuntimeError(f"{sid}: no data rows found (format changed?)")
-    df = pd.read_csv(
-        io.StringIO("\n".join(lines[start:])),
-        sep=r"\s+", header=None, names=["date", "value"], engine="python",
-    )
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["value"] = pd.to_numeric(df["value"], errors="coerce")  # '.' -> NaN
-    s = df.dropna(subset=["date"]).set_index("date")["value"].sort_index()
-    if s.notna().sum() < MIN_ROWS:
-        raise RuntimeError(f"{sid}: only {s.notna().sum()} valid obs (< {MIN_ROWS})")
-    return s
+        raise RuntimeError("no data rows found (format changed?)")
+    df = pd.read_csv(io.StringIO("\n".join(lines[start:])), sep=r"\s+", header=None,
+                     names=["date", "value"], engine="python")
+    return df
+
+
+def _parse_csv(text: str) -> pd.DataFrame:
+    """fredgraph.csv = 'observation_date,<SID>' (older exports use 'DATE')."""
+    df = pd.read_csv(io.StringIO(text))
+    if df.shape[1] < 2:
+        raise RuntimeError(f"unexpected csv shape {df.shape}")
+    df.columns = ["date", "value"] + list(df.columns[2:])
+    return df[["date", "value"]]
+
+
+def fetch_series(sid: str) -> pd.Series:
+    """Fetch one FRED series. CSV export first (light), .txt table as fallback,
+    each with retries — a single slow response must not null out a whole field."""
+    last_err = None
+    for attempt in range(RETRIES):
+        for url, parser in ((FRED_CSV.format(sid=sid), _parse_csv),
+                            (FRED_TXT.format(sid=sid), _parse_txt)):
+            try:
+                r = requests.get(url, headers=UA, timeout=TIMEOUT)
+                r.raise_for_status()
+                df = parser(r.text)
+                df["date"] = pd.to_datetime(df["date"], errors="coerce")
+                df["value"] = pd.to_numeric(df["value"], errors="coerce")  # '.' -> NaN
+                s = df.dropna(subset=["date"]).set_index("date")["value"].sort_index()
+                if s.notna().sum() < MIN_ROWS:
+                    raise RuntimeError(f"only {s.notna().sum()} valid obs (< {MIN_ROWS})")
+                return s
+            except Exception as e:
+                last_err = e
+        if attempt < RETRIES - 1:
+            time.sleep(BACKOFF * (2 ** attempt))
+    raise RuntimeError(f"{sid}: {last_err}")
 
 
 
@@ -142,7 +173,8 @@ def load_members() -> list:
     and the list never silently goes years stale."""
     tickers = []
     try:
-        tables = pd.read_html(requests.get(WIKI_SP500, headers=UA, timeout=TIMEOUT).text)
+        html = requests.get(WIKI_SP500, headers=UA, timeout=TIMEOUT).text
+        tables = pd.read_html(io.StringIO(html))   # pandas>=2.1 requires a buffer
         for t in tables:
             if "Symbol" in t.columns:
                 tickers = [str(x).replace(".", "-").strip() for x in t["Symbol"]]

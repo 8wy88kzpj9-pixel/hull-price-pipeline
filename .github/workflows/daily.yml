@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +26,6 @@ jobs:
         run: python build_weekly.py
 
       - name: Build macro series
-        id: macro
         run: python build_macro.py
 
       - name: Commit outputs
@@ -33,11 +33,9 @@ jobs:
         run: |
           git config user.name  "price-bot"
           git config user.email "actions@github.com"
-          git add data/weekly_closes.csv data/hull_weekly.csv data/_status.json \
-                  data/macro_daily.csv data/macro_weekly.csv data/_macro_status.json \
-                  data/sp500_members.csv 2>/dev/null || true
+          git add -A data/ 2>/dev/null || true
           git diff --cached --quiet || git commit -m "prices+macro $(date -u +%F)"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push
 
       - name: Staleness alarm

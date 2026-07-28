@@ -1,21 +1,23 @@
 {
-  "asof": "2026-07-24",
-  "coverage": 1.0,
-  "rows": 157,
-  "missing_tickers": [],
-  "run_utc": "2026-07-26T16:11:31+00:00",
+  "asof": "2026-07-31",
+  "coverage": 0.967,
+  "rows": 158,
+  "missing_tickers": [
+    "SETBK"
+  ],
+  "run_utc": "2026-07-27T23:48:59+00:00",
   "hull_nulls": [],
   "near_flips": [
-    "INDA -0.13",
-    "THD +0.27",
-    "HYG -0.06",
-    "LQD -0.16",
-    "EWJ +0.29",
-    "VGK +0.09",
-    "IWF +0.23",
-    "XLU +0.06",
-    "XLE -0.05",
-    "XLB -0.03",
-    "XLY -0.23"
+    "EEM +0.19",
+    "INDA -0.11",
+    "THD +0.19",
+    "HYG -0.07",
+    "LQD -0.19",
+    "EWJ +0.20",
+    "VGK +0.07",
+    "IWF +0.17",
+    "XLU +0.04",
+    "XLE -0.02",
+    "XLB -0.11"
   ]
 }

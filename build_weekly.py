@@ -25,6 +25,7 @@ OUTPUTS (all under data/)
     hull_weekly.csv    - asof,ticker,close,hma55,hma55_prev,margin_pct,color,
                          near_flip   <- tracker reads verdicts from here
     _status.json       - asof date, coverage %, run timestamp, per-ticker nulls
+    vol_indices.csv    - asof,index,close,pct_52w,lo_52w,hi_52w  <- IV_DATA source
 
 HULL CONVENTION (calibrated against the committed seed on 2026-07-03: all 28
 tickers matched on color, and the near-flip set matched WEEKLY_LOG exactly):
@@ -38,6 +39,13 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.4: Cboe volatility indices (VIX/VXN/GVZ/RVX/OVX/VXEEM/VXFXI/VXEWZ/VXEFA/
+      VXHYG/SKEW) fetched here rather than FRED — FRED read-times-out from
+      GitHub runners (cloud-IP throttling, observed 2026-07-27..08-02) while
+      Yahoo serves them fine. Writes vol_indices.csv with the 52-week percentile
+      each index sits at, so the tracker's IV_DATA stops going stale by hand.
+      This block never fails the run: a missing index is written null.
+v1.3: full hull board printed to the run log (CDN cache made log-only reads necessary).
 v1.2: chunked fetch + backoff + per-ticker sweep (Yahoo rate-limit resilience).
 v1.1: SYMBOL_MAP for vendor tickers (BTC-USD/^GSPC/^SET.BK) +
       Friday week-ending labels to match the seed convention.
@@ -58,6 +66,7 @@ DATA = Path("data")
 CLOSES = DATA / "weekly_closes.csv"
 HULL = DATA / "hull_weekly.csv"
 STATUS = DATA / "_status.json"
+VOLIDX = DATA / "vol_indices.csv"
 
 HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
 HMA_PERIOD = 55
@@ -69,6 +78,23 @@ PAUSE = 1.5             # seconds between requests
 RETRIES = 3             # batch passes before falling back to one-by-one
 BACKOFF = 20            # base seconds between retry passes (doubles each time)
 MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
+
+# ---- Cboe volatility indices (daily) -> data/vol_indices.csv ----------------
+# Column name in the tracker's IV_DATA -> Yahoo symbol.
+VOL_INDICES = {
+    "VIX": "^VIX",        # S&P 500 30d IV      -> us_largecap, global_stocks
+    "VXN": "^VXN",        # Nasdaq 100 30d IV   -> ustech, sec_tech
+    "GVZ": "^GVZ",        # Gold (GLD) 30d IV   -> gold
+    "RVX": "^RVX",        # Russell 2000 30d IV -> us_smallcap
+    "OVX": "^OVX",        # Crude oil 30d IV    -> sec_energy (proxy)
+    "VXEEM": "^VXEEM",    # EM (EEM) 30d IV     -> em, em_total
+    "VXFXI": "^VXFXI",    # China (FXI) 30d IV  -> china_stocks, em_china
+    "VXEWZ": "^VXEWZ",    # Brazil (EWZ) 30d IV -> em_brazil
+    "VXEFA": "^VXEFA",    # EAFE 30d IV         -> japan/europe (REGIONAL proxy)
+    "VXHYG": "^VXHYG",    # HY credit 30d IV    -> bonds
+    "SKEW": "^SKEW",      # tail-risk pricing   -> context only, not an IV
+}
+VOL_HISTORY = "1y"      # enough for a 52-week percentile
 
 # Column name in weekly_closes.csv -> yfinance symbol. Column names are the
 # system of record (tracker/TICKER_MAP read them); only the fetch layer needs
@@ -187,6 +213,41 @@ def fetch_weekly(tickers: list) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------- validate -----
+
+# ────────────────────── Cboe volatility indices ──────────────────────────────
+def fetch_vol_indices() -> pd.DataFrame:
+    """Daily closes for the Cboe vol complex, plus where each sits in its own
+    52-week range. Percentile matters more than level: VIX 16 means something
+    different in a 12-30 year than in a 15-45 one, and the tracker's putBuy /
+    putThresh bands are range-relative.
+
+    Failure is per-index and never fatal — a missing index is written null so
+    the tracker can keep its sourced-or-null contract."""
+    import time
+    import yfinance as yf
+
+    rows = []
+    for name, sym in VOL_INDICES.items():
+        val = lo = hi = pct = None
+        asof = None
+        try:
+            h = yf.Ticker(sym).history(period=VOL_HISTORY, interval="1d",
+                                       auto_adjust=False)["Close"].dropna()
+            if len(h) >= 30:
+                val = round(float(h.iloc[-1]), 2)
+                lo, hi = round(float(h.min()), 2), round(float(h.max()), 2)
+                pct = round(float((h <= h.iloc[-1]).mean() * 100), 1)
+                asof = pd.to_datetime(h.index[-1]).date().isoformat()
+            else:
+                print(f"  vol {name:<6} only {len(h)} obs — null", file=sys.stderr)
+        except Exception as e:
+            print(f"  vol {name:<6} FAILED: {str(e)[:70]}", file=sys.stderr)
+        rows.append(dict(asof=asof, index=name, symbol=sym, close=val,
+                         pct_52w=pct, lo_52w=lo, hi_52w=hi))
+        time.sleep(PAUSE)
+    return pd.DataFrame(rows)
+
+
 def validate(new: pd.DataFrame, tickers: list) -> dict:
     """Gate before any write. Returns report; raises SystemExit on failure so
     the Actions run goes RED instead of silently committing garbage."""
@@ -270,8 +331,35 @@ def main() -> None:
         "near_flips": near,
     }, indent=2))
 
+    # ---- Cboe vol indices (independent failure; never blocks the price run) ----
+    try:
+        vol = fetch_vol_indices()
+        vol.to_csv(VOLIDX, index=False)
+        ok = vol["close"].notna().sum()
+        print(f"WROTE {VOLIDX} ({ok}/{len(vol)} indices)")
+        print("\nVOL INDICES:")
+        for _, v in vol.iterrows():
+            if pd.notna(v["close"]):
+                print(f"  {v['index']:<7}{v['close']:>7.2f}  {v['pct_52w']:>5.1f}%ile"
+                      f"  range {v['lo_52w']}-{v['hi_52w']}  asof {v['asof']}")
+            else:
+                print(f"  {v['index']:<7}   null")
+    except Exception as e:
+        print(f"vol indices block failed (non-fatal): {str(e)[:120]}", file=sys.stderr)
+
     print(f"WROTE {CLOSES} / {HULL} / {STATUS}")
     print("near-flips (CHART-VERIFY per hysteresis rule):", near or "none")
+
+    # Full board in the run's own log. The committed CSV can sit behind a CDN
+    # cache for several minutes after a push, so the log must be sufficient on
+    # its own to reconstruct every signal without a second channel.
+    print(f"\nHULL BOARD (asof {rep['asof']}):")
+    for r in rows:
+        if r["color"]:
+            flag = "  **NEAR**" if r["near_flip"] else ""
+            print(f"  {r['ticker']:<8}{r['color']:<6}{r['margin_pct']:+.2f}{flag}")
+        else:
+            print(f"  {r['ticker']:<8}null")
 
 
 if __name__ == "__main__":

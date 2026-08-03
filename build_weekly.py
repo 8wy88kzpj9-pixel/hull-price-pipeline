@@ -26,6 +26,7 @@ OUTPUTS (all under data/)
                          near_flip   <- tracker reads verdicts from here
     _status.json       - asof date, coverage %, run timestamp, per-ticker nulls
     vol_indices.csv    - asof,index,close,pct_52w,lo_52w,hi_52w  <- IV_DATA source
+    hull3d.csv         - HMA(55) on 3-trading-day bars, one row per ticker
 
 HULL CONVENTION (calibrated against the committed seed on 2026-07-03: all 28
 tickers matched on color, and the near-flip set matched WEEKLY_LOG exactly):
@@ -39,6 +40,10 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.5: hull3d folded in as a third block rather than a separate repo/workflow —
+      one ticker universe, one fetch discipline, one commit. A second workflow
+      would have hit the same Yahoo rate limiter from the same runner pool and
+      forced a duplicate ticker list to drift out of sync.
 v1.4: Cboe volatility indices (VIX/VXN/GVZ/RVX/OVX/VXEEM/VXFXI/VXEWZ/VXEFA/
       VXHYG/SKEW) fetched here rather than FRED — FRED read-times-out from
       GitHub runners (cloud-IP throttling, observed 2026-07-27..08-02) while
@@ -67,6 +72,7 @@ CLOSES = DATA / "weekly_closes.csv"
 HULL = DATA / "hull_weekly.csv"
 STATUS = DATA / "_status.json"
 VOLIDX = DATA / "vol_indices.csv"
+HULL3D = DATA / "hull3d.csv"
 
 HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
 HMA_PERIOD = 55
@@ -77,6 +83,22 @@ CHUNK = 6               # symbols per request — large batches trip Yahoo's lim
 PAUSE = 1.5             # seconds between requests
 RETRIES = 3             # batch passes before falling back to one-by-one
 BACKOFF = 20            # base seconds between retry passes (doubles each time)
+
+# ---- hull3d block: HMA(55) on 3-trading-day bars ---------------------------
+# Same period as the weekly system by explicit decision. 55 bars x 3D is about
+# eight calendar months, so it reacts roughly 40% faster than HMA55 weekly while
+# still filtering the noise a daily read would let through. Fed by the SAME
+# ticker universe as weekly_closes.csv - never a second hardcoded list.
+BAR_DAYS_3D = 3
+DAILY_HISTORY = "2y"    # 55+28+7 3D bars needs ~270 trading days; 2y is ample
+EST_FLAG_3D = "parallel-validation"   # clear only via a versioned commit
+
+# Margin is a PER-BAR slope, so it does not transfer across timeframes: on an
+# identical price path a 3-day bar produces a smaller margin than a 5-day weekly
+# bar simply because it spans less time (measured 0.25 vs 0.42 on a linear ramp).
+# The 0.30 weekly hysteresis band would therefore over-flag on 3D. Scaled by the
+# bar-length ratio 3/5: 0.30 * 0.6 = 0.18.
+NEAR_FLIP_3D = 0.18
 MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
 
 # ---- Cboe volatility indices (daily) -> data/vol_indices.csv ----------------
@@ -134,6 +156,101 @@ def hull_row(series: pd.Series):
 
 
 # ------------------------------------------------------------- download -----
+
+# ───────────────────────── hull3d: 3-day-bar Hull ────────────────────────────
+def to_3d_closes(daily_close: pd.Series, bar_days: int = BAR_DAYS_3D) -> pd.Series:
+    """Group daily closes into N-trading-day bars anchored at the most recent
+    COMPLETED day, so the latest bar is always full. The oldest partial group is
+    dropped.
+
+    NOTE ON BOUNDARIES: TradingView anchors 3D bars from the start of the series,
+    so its bar edges can sit +/-1 day away from these depending on how much chart
+    history is loaded. Margins near zero will therefore disagree occasionally —
+    the hysteresis rule applies to hull3d exactly as it does to weekly."""
+    s = daily_close.dropna().sort_index()
+    n = len(s)
+    if n < bar_days:
+        return pd.Series(dtype=float)
+    idx_from_end = np.arange(n - 1, -1, -1)
+    bar_id = idx_from_end // bar_days
+    counts = pd.Series(bar_id, index=s.index).value_counts()
+    keep = set(counts[counts == bar_days].index)
+    frame = pd.DataFrame({"close": s, "bar": bar_id})
+    frame = frame[frame["bar"].isin(keep)]
+    if frame.empty:
+        return pd.Series(dtype=float)
+    grp = frame.groupby("bar")
+    closes = grp["close"].last()
+    dates = grp.apply(lambda g: g.index.max())
+    out = pd.Series(closes.values, index=pd.to_datetime(dates.values))
+    out = out.sort_index()
+    out.index.name = "bar_end"
+    return out
+
+
+def fetch_daily(tickers: list) -> dict:
+    """Daily closes, chunked with backoff — identical discipline to the weekly
+    fetch, because the failure that took this pipeline down was a rate limit,
+    not a bad symbol."""
+    import time
+    import yfinance as yf
+
+    out = {}
+    for attempt in range(RETRIES):
+        pending = [t for t in tickers if t not in out]
+        if not pending:
+            break
+        if attempt:
+            wait = BACKOFF * (2 ** (attempt - 1))
+            print(f"  hull3d retry {attempt}: {len(pending)} missing, waiting {wait}s")
+            time.sleep(wait)
+        for i in range(0, len(pending), CHUNK):
+            grp = pending[i:i + CHUNK]
+            syms = [SYMBOL_MAP.get(t, t) for t in grp]
+            try:
+                raw = yf.download(" ".join(syms), period=DAILY_HISTORY, interval="1d",
+                                  auto_adjust=False, group_by="ticker",
+                                  threads=False, progress=False)
+                for t in grp:
+                    sym = SYMBOL_MAP.get(t, t)
+                    try:
+                        col = raw[sym]["Close"] if len(grp) > 1 else raw["Close"]
+                        if col is not None and col.notna().sum() > 250:
+                            out[t] = col
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"  hull3d chunk {grp[0]}..{grp[-1]}: {str(e)[:80]}",
+                      file=sys.stderr)
+            time.sleep(PAUSE)
+    return out
+
+
+def build_hull3d(tickers: list) -> pd.DataFrame:
+    """One row per ticker: HMA(55) on 3D bars. Null means no signal, never a
+    default — the tracker must be able to tell 'red' from 'unknown'."""
+    daily = fetch_daily(tickers)
+    print(f"  hull3d fetched {len(daily)}/{len(tickers)} tickers (daily)")
+    rows = []
+    for t in tickers:
+        c = ht = hp = m = col = nf = None
+        bars_used = 0
+        asof = None
+        if t in daily:
+            bars = to_3d_closes(daily[t])
+            bars_used = int(bars.dropna().shape[0])
+            if bars_used:
+                asof = pd.to_datetime(bars.index.max()).date().isoformat()
+            c, ht, hp, m, col, _ = hull_row(bars)
+            # re-derive near_flip against the 3D-scaled band, not weekly's
+            nf = (abs(m) < NEAR_FLIP_3D) if m is not None else None
+        rows.append(dict(asof=asof, ticker=t, bars_3d_used=bars_used,
+                         close_3d=c, hma55_3d=ht, hma55_3d_prev=hp,
+                         margin_pct=m, color=col, near_flip=nf,
+                         est_flag=EST_FLAG_3D))
+    return pd.DataFrame(rows)
+
+
 def fetch_weekly(tickers: list) -> pd.DataFrame:
     """Weekly closes for all tickers.
 
@@ -330,6 +447,30 @@ def main() -> None:
         "hull_nulls": [r["ticker"] for r in rows if r["color"] is None],
         "near_flips": near,
     }, indent=2))
+
+    # ---- hull3d (independent failure; never blocks the weekly hull) ----
+    try:
+        h3 = build_hull3d(tickers)
+        h3.to_csv(HULL3D, index=False)
+        ok = int(h3["color"].notna().sum())
+        a3 = h3["asof"].dropna().max()
+        print(f"WROTE {HULL3D} ({ok}/{len(h3)} tickers, asof {a3})")
+        print(f"\nHULL3D BOARD (asof {a3}) [{EST_FLAG_3D}]:")
+        for _, r in h3.iterrows():
+            if pd.notna(r["color"]):
+                flag = "  **NEAR**" if r["near_flip"] else ""
+                print(f"  {r['ticker']:<8}{r['color']:<6}{r['margin_pct']:+.2f}{flag}")
+            else:
+                print(f"  {r['ticker']:<8}null")
+        # disagreement with the weekly read is the whole point of running both
+        wk = {r["ticker"]: r["color"] for r in rows if r["color"]}
+        diff = [f"{r['ticker']} 3D:{r['color']} vs W:{wk[r['ticker']]}"
+                for _, r in h3.iterrows()
+                if pd.notna(r["color"]) and wk.get(r["ticker"])
+                and r["color"] != wk[r["ticker"]]]
+        print(f"3D-vs-WEEKLY disagreements ({len(diff)}): {diff or 'none'}")
+    except Exception as e:
+        print(f"hull3d block failed (non-fatal): {str(e)[:140]}", file=sys.stderr)
 
     # ---- Cboe vol indices (independent failure; never blocks the price run) ----
     try:

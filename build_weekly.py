@@ -40,6 +40,11 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.6: 45s cool-down between the weekly and daily fetch phases. hull3d doubles
+      the request count in a single run, and Yahoo answered the first attempt
+      with empty frames (30/30 "fetched", 3% coverage) — the validate-then-write
+      gate caught it and preserved the good file, but the fetch itself needs to
+      stop crowding the limiter.
 v1.5: hull3d folded in as a third block rather than a separate repo/workflow —
       one ticker universe, one fetch discipline, one commit. A second workflow
       would have hit the same Yahoo rate limiter from the same runner pool and
@@ -99,6 +104,7 @@ EST_FLAG_3D = "parallel-validation"   # clear only via a versioned commit
 # The 0.30 weekly hysteresis band would therefore over-flag on 3D. Scaled by the
 # bar-length ratio 3/5: 0.30 * 0.6 = 0.18.
 NEAR_FLIP_3D = 0.18
+COOLDOWN_3D = 45        # seconds between the weekly and the daily fetch phase
 MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
 
 # ---- Cboe volatility indices (daily) -> data/vol_indices.csv ----------------
@@ -229,6 +235,13 @@ def fetch_daily(tickers: list) -> dict:
 def build_hull3d(tickers: list) -> pd.DataFrame:
     """One row per ticker: HMA(55) on 3D bars. Null means no signal, never a
     default — the tracker must be able to tell 'red' from 'unknown'."""
+    # Cool-down between the weekly and daily pulls. Without it this run fires
+    # ~60 requests back to back and Yahoo starts returning empty frames — the
+    # exact signature that silently broke the pipeline on 2026-07-10 and failed
+    # the 2026-08-03 run at 3% coverage.
+    import time
+    print(f"  hull3d: cooling down {COOLDOWN_3D}s before the daily pull ...")
+    time.sleep(COOLDOWN_3D)
     daily = fetch_daily(tickers)
     print(f"  hull3d fetched {len(daily)}/{len(tickers)} tickers (daily)")
     rows = []

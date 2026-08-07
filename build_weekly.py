@@ -1,520 +1,175 @@
-#!/usr/bin/env python3
-"""
-build_weekly.py — self-healing weekly closes + Hull(55) for hull-price-pipeline.
-
-WHY THIS EXISTS
----------------
-The previous pipeline appended one row per run and committed unconditionally.
-When the price fetch silently failed (equities returned empty while BTC still
-worked), it wrote a blank row and reported success. Result: data stopped at
-2026-07-03, nobody noticed for 3 weeks, and Hull went dark exactly when the
-regime turned. Two design errors:
-    1. INCREMENTAL  -> one bad run permanently loses a week.
-    2. UNCONDITIONAL COMMIT -> failure looks identical to success.
-
-This script fixes both:
-    1. IDEMPOTENT REBUILD - every run downloads full history and rebuilds the
-       whole file. A week missed on Monday is automatically backfilled Tuesday.
-       Self-healing; no manual patching, ever.
-    2. VALIDATE-THEN-WRITE - nothing is written unless the new data passes
-       coverage + regression checks. A failed fetch exits non-zero, the old
-       (good) file stays untouched, and the Actions run turns RED.
-
-OUTPUTS (all under data/)
-    weekly_closes.csv  - Friday closes per ticker (unchanged schema)
-    hull_weekly.csv    - asof,ticker,close,hma55,hma55_prev,margin_pct,color,
-                         near_flip   <- tracker reads verdicts from here
-    _status.json       - asof date, coverage %, run timestamp, per-ticker nulls
-    vol_indices.csv    - asof,index,close,pct_52w,lo_52w,hi_52w  <- IV_DATA source
-    hull3d.csv         - HMA(55) on 3-trading-day bars, one row per ticker
-
-HULL CONVENTION (calibrated against the committed seed on 2026-07-03: all 28
-tickers matched on color, and the near-flip set matched WEEKLY_LOG exactly):
-    HMA(55) = WMA(2*WMA(c,28) - WMA(c,55), 7)
-    color   = green if HMA_t > HMA_t-1 else red      (binary, no neutral)
-    margin  = (HMA_t - HMA_t-1)/HMA_t-1 * 100
-    near_flip = |margin| < 0.30  -> hysteresis rule: CHART-VERIFY before use.
-
-USAGE
-    pip install "yfinance>=0.2.60" pandas numpy
-    python build_weekly.py            # normal run
-    python build_weekly.py --dry-run  # validate only, write nothing
-
-v1.6: 45s cool-down between the weekly and daily fetch phases. hull3d doubles
-      the request count in a single run, and Yahoo answered the first attempt
-      with empty frames (30/30 "fetched", 3% coverage) — the validate-then-write
-      gate caught it and preserved the good file, but the fetch itself needs to
-      stop crowding the limiter.
-v1.5: hull3d folded in as a third block rather than a separate repo/workflow —
-      one ticker universe, one fetch discipline, one commit. A second workflow
-      would have hit the same Yahoo rate limiter from the same runner pool and
-      forced a duplicate ticker list to drift out of sync.
-v1.4: Cboe volatility indices (VIX/VXN/GVZ/RVX/OVX/VXEEM/VXFXI/VXEWZ/VXEFA/
-      VXHYG/SKEW) fetched here rather than FRED — FRED read-times-out from
-      GitHub runners (cloud-IP throttling, observed 2026-07-27..08-02) while
-      Yahoo serves them fine. Writes vol_indices.csv with the 52-week percentile
-      each index sits at, so the tracker's IV_DATA stops going stale by hand.
-      This block never fails the run: a missing index is written null.
-v1.3: full hull board printed to the run log (CDN cache made log-only reads necessary).
-v1.2: chunked fetch + backoff + per-ticker sweep (Yahoo rate-limit resilience).
-v1.1: SYMBOL_MAP for vendor tickers (BTC-USD/^GSPC/^SET.BK) +
-      Friday week-ending labels to match the seed convention.
-"""
-
-import argparse
-import json
-import math
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
-# ---------------------------------------------------------------- config ----
-DATA = Path("data")
-CLOSES = DATA / "weekly_closes.csv"
-HULL = DATA / "hull_weekly.csv"
-STATUS = DATA / "_status.json"
-VOLIDX = DATA / "vol_indices.csv"
-HULL3D = DATA / "hull3d.csv"
-
-HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
-HMA_PERIOD = 55
-NEAR_FLIP_ABS = 0.30
-
-MIN_COVERAGE = 0.90     # latest row must have >=90% of tickers populated
-CHUNK = 6               # symbols per request — large batches trip Yahoo's limiter
-PAUSE = 1.5             # seconds between requests
-RETRIES = 3             # batch passes before falling back to one-by-one
-BACKOFF = 20            # base seconds between retry passes (doubles each time)
-
-# ---- hull3d block: HMA(55) on 3-trading-day bars ---------------------------
-# Same period as the weekly system by explicit decision. 55 bars x 3D is about
-# eight calendar months, so it reacts roughly 40% faster than HMA55 weekly while
-# still filtering the noise a daily read would let through. Fed by the SAME
-# ticker universe as weekly_closes.csv - never a second hardcoded list.
-BAR_DAYS_3D = 3
-DAILY_HISTORY = "2y"    # 55+28+7 3D bars needs ~270 trading days; 2y is ample
-EST_FLAG_3D = "parallel-validation"   # clear only via a versioned commit
-
-# Margin is a PER-BAR slope, so it does not transfer across timeframes: on an
-# identical price path a 3-day bar produces a smaller margin than a 5-day weekly
-# bar simply because it spans less time (measured 0.25 vs 0.42 on a linear ramp).
-# The 0.30 weekly hysteresis band would therefore over-flag on 3D. Scaled by the
-# bar-length ratio 3/5: 0.30 * 0.6 = 0.18.
-NEAR_FLIP_3D = 0.18
-COOLDOWN_3D = 45        # seconds between the weekly and the daily fetch phase
-MIN_ROWS = 60           # sanity floor; HMA55 needs ~62 rows to emit 2 values
-
-# ---- Cboe volatility indices (daily) -> data/vol_indices.csv ----------------
-# Column name in the tracker's IV_DATA -> Yahoo symbol.
-VOL_INDICES = {
-    "VIX": "^VIX",        # S&P 500 30d IV      -> us_largecap, global_stocks
-    "VXN": "^VXN",        # Nasdaq 100 30d IV   -> ustech, sec_tech
-    "GVZ": "^GVZ",        # Gold (GLD) 30d IV   -> gold
-    "RVX": "^RVX",        # Russell 2000 30d IV -> us_smallcap
-    "OVX": "^OVX",        # Crude oil 30d IV    -> sec_energy (proxy)
-    "VXEEM": "^VXEEM",    # EM (EEM) 30d IV     -> em, em_total
-    "VXFXI": "^VXFXI",    # China (FXI) 30d IV  -> china_stocks, em_china
-    "VXEWZ": "^VXEWZ",    # Brazil (EWZ) 30d IV -> em_brazil
-    "VXEFA": "^VXEFA",    # EAFE 30d IV         -> japan/europe (REGIONAL proxy)
-    "VXHYG": "^VXHYG",    # HY credit 30d IV    -> bonds
-    "SKEW": "^SKEW",      # tail-risk pricing   -> context only, not an IV
-}
-VOL_HISTORY = "1y"      # enough for a 52-week percentile
-
-# Column name in weekly_closes.csv -> yfinance symbol. Column names are the
-# system of record (tracker/TICKER_MAP read them); only the fetch layer needs
-# the vendor spelling. Add here when a fetch returns empty for one ticker.
-SYMBOL_MAP = {
-    "BTCUSD": "BTC-USD",
-    "GSPC": "^GSPC",
-    "SETBK": "^SET.BK",
-}
-
-
-# ------------------------------------------------------------ hull engine ---
-def wma(s: pd.Series, n: int) -> pd.Series:
-    n = int(n)
-    w = np.arange(1.0, n + 1.0)
-    return s.rolling(n).apply(lambda x: float(np.dot(x, w) / w.sum()), raw=True)
-
-
-def hma(s: pd.Series, n: int = HMA_PERIOD) -> pd.Series:
-    half, root = int(round(n / 2.0)), int(round(math.sqrt(n)))
-    return wma(2.0 * wma(s, half) - wma(s, n), root)
-
-
-def hull_row(series: pd.Series):
-    """(close, hma, hma_prev, margin, color, near_flip) or Nones. Null means
-    NO SIGNAL — never a default. Downstream must not treat it as neutral."""
-    s = series.dropna().astype(float)
-    h = hma(s).dropna()
-    if len(h) < 2 or len(s) == 0:
-        return (None,) * 6
-    ht, hp = float(h.iloc[-1]), float(h.iloc[-2])
-    if hp == 0:
-        return (None,) * 6
-    m = (ht - hp) / hp * 100.0
-    return (round(float(s.iloc[-1]), 4), round(ht, 4), round(hp, 4),
-            round(m, 2), "green" if m > 0 else "red", abs(m) < NEAR_FLIP_ABS)
-
-
-# ------------------------------------------------------------- download -----
-
-# ───────────────────────── hull3d: 3-day-bar Hull ────────────────────────────
-def to_3d_closes(daily_close: pd.Series, bar_days: int = BAR_DAYS_3D) -> pd.Series:
-    """Group daily closes into N-trading-day bars anchored at the most recent
-    COMPLETED day, so the latest bar is always full. The oldest partial group is
-    dropped.
-
-    NOTE ON BOUNDARIES: TradingView anchors 3D bars from the start of the series,
-    so its bar edges can sit +/-1 day away from these depending on how much chart
-    history is loaded. Margins near zero will therefore disagree occasionally —
-    the hysteresis rule applies to hull3d exactly as it does to weekly."""
-    s = daily_close.dropna().sort_index()
-    n = len(s)
-    if n < bar_days:
-        return pd.Series(dtype=float)
-    idx_from_end = np.arange(n - 1, -1, -1)
-    bar_id = idx_from_end // bar_days
-    counts = pd.Series(bar_id, index=s.index).value_counts()
-    keep = set(counts[counts == bar_days].index)
-    frame = pd.DataFrame({"close": s, "bar": bar_id})
-    frame = frame[frame["bar"].isin(keep)]
-    if frame.empty:
-        return pd.Series(dtype=float)
-    grp = frame.groupby("bar")
-    closes = grp["close"].last()
-    dates = grp.apply(lambda g: g.index.max())
-    out = pd.Series(closes.values, index=pd.to_datetime(dates.values))
-    out = out.sort_index()
-    out.index.name = "bar_end"
-    return out
-
-
-def fetch_daily(tickers: list) -> dict:
-    """Daily closes, chunked with backoff — identical discipline to the weekly
-    fetch, because the failure that took this pipeline down was a rate limit,
-    not a bad symbol."""
-    import time
-    import yfinance as yf
-
-    out = {}
-    for attempt in range(RETRIES):
-        pending = [t for t in tickers if t not in out]
-        if not pending:
-            break
-        if attempt:
-            wait = BACKOFF * (2 ** (attempt - 1))
-            print(f"  hull3d retry {attempt}: {len(pending)} missing, waiting {wait}s")
-            time.sleep(wait)
-        for i in range(0, len(pending), CHUNK):
-            grp = pending[i:i + CHUNK]
-            syms = [SYMBOL_MAP.get(t, t) for t in grp]
-            try:
-                raw = yf.download(" ".join(syms), period=DAILY_HISTORY, interval="1d",
-                                  auto_adjust=False, group_by="ticker",
-                                  threads=False, progress=False)
-                for t in grp:
-                    sym = SYMBOL_MAP.get(t, t)
-                    try:
-                        col = raw[sym]["Close"] if len(grp) > 1 else raw["Close"]
-                        if col is not None and col.notna().sum() > 250:
-                            out[t] = col
-                    except Exception:
-                        pass
-            except Exception as e:
-                print(f"  hull3d chunk {grp[0]}..{grp[-1]}: {str(e)[:80]}",
-                      file=sys.stderr)
-            time.sleep(PAUSE)
-    return out
-
-
-def build_hull3d(tickers: list) -> pd.DataFrame:
-    """One row per ticker: HMA(55) on 3D bars. Null means no signal, never a
-    default — the tracker must be able to tell 'red' from 'unknown'."""
-    # Cool-down between the weekly and daily pulls. Without it this run fires
-    # ~60 requests back to back and Yahoo starts returning empty frames — the
-    # exact signature that silently broke the pipeline on 2026-07-10 and failed
-    # the 2026-08-03 run at 3% coverage.
-    import time
-    print(f"  hull3d: cooling down {COOLDOWN_3D}s before the daily pull ...")
-    time.sleep(COOLDOWN_3D)
-    daily = fetch_daily(tickers)
-    print(f"  hull3d fetched {len(daily)}/{len(tickers)} tickers (daily)")
-    rows = []
-    for t in tickers:
-        c = ht = hp = m = col = nf = None
-        bars_used = 0
-        asof = None
-        if t in daily:
-            bars = to_3d_closes(daily[t])
-            bars_used = int(bars.dropna().shape[0])
-            if bars_used:
-                asof = pd.to_datetime(bars.index.max()).date().isoformat()
-            c, ht, hp, m, col, _ = hull_row(bars)
-            # re-derive near_flip against the 3D-scaled band, not weekly's
-            nf = (abs(m) < NEAR_FLIP_3D) if m is not None else None
-        rows.append(dict(asof=asof, ticker=t, bars_3d_used=bars_used,
-                         close_3d=c, hma55_3d=ht, hma55_3d_prev=hp,
-                         margin_pct=m, color=col, near_flip=nf,
-                         est_flag=EST_FLAG_3D))
-    return pd.DataFrame(rows)
-
-
-def fetch_weekly(tickers: list) -> pd.DataFrame:
-    """Weekly closes for all tickers.
-
-    Yahoo rate-limits bursty requests: a single 30-symbol batch can come back
-    empty for every equity while crypto still resolves (observed 2026-07-10 and
-    again 2026-07-27 — the exact signature that took this pipeline down). So:
-    small chunks, backoff between them, then a slow per-ticker sweep for anything
-    still missing. Slower by design; a run that takes 90s and succeeds beats one
-    that takes 8s and returns nothing."""
-    import time
-    import yfinance as yf
-
-    out = {}
-
-    def keep(t, col):
-        if col is not None and col.notna().sum() >= MIN_ROWS:
-            out[t] = col
-            return True
-        return False
-
-    # ---- pass 1: chunked batches with backoff ----
-    for attempt in range(RETRIES):
-        pending = [t for t in tickers if t not in out]
-        if not pending:
-            break
-        if attempt:
-            wait = BACKOFF * (2 ** (attempt - 1))
-            print(f"  retry {attempt}: {len(pending)} missing, waiting {wait}s")
-            time.sleep(wait)
-        for i in range(0, len(pending), CHUNK):
-            grp = pending[i:i + CHUNK]
-            syms = [SYMBOL_MAP.get(t, t) for t in grp]
-            try:
-                raw = yf.download(" ".join(syms), period=HISTORY, interval="1wk",
-                                  auto_adjust=False, group_by="ticker",
-                                  threads=False, progress=False)
-                for t in grp:
-                    sym = SYMBOL_MAP.get(t, t)
-                    try:
-                        col = raw[sym]["Close"] if len(grp) > 1 else raw["Close"]
-                        keep(t, col)
-                    except Exception:
-                        pass
-            except Exception as e:
-                print(f"  chunk {grp[0]}..{grp[-1]} failed: {str(e)[:90]}",
-                      file=sys.stderr)
-            time.sleep(PAUSE)
-
-    # ---- pass 2: per-ticker sweep for stragglers ----
-    for t in [t for t in tickers if t not in out]:
-        try:
-            h = yf.Ticker(SYMBOL_MAP.get(t, t)).history(
-                period=HISTORY, interval="1wk", auto_adjust=False)["Close"]
-            if not keep(t, h):
-                print(f"WARN {t}: only {h.notna().sum()} rows", file=sys.stderr)
-        except Exception as e:
-            print(f"WARN {t} single fetch failed: {str(e)[:90]}", file=sys.stderr)
-        time.sleep(PAUSE)
-
-    print(f"  fetched {len(out)}/{len(tickers)} tickers")
-
-    if not out:
-        sys.exit("FATAL: no ticker returned data — refusing to write anything")
-
-    df = pd.DataFrame(out)
-    idx = pd.to_datetime(df.index)
-    try:
-        idx = idx.tz_localize(None)
-    except TypeError:
-        idx = idx.tz_convert(None)
-    # yfinance labels a weekly bar with its MONDAY. The seed/WEEKLY_LOG label
-    # weeks by the FRIDAY close. Shift +4 days so date identity matches the
-    # system of record — mismatched labels are how wrong-date errors start.
-    df.index = idx.normalize() + pd.Timedelta(days=4)
-    df.index.name = "week_ending"
-    return df.sort_index()
-
-
-# ------------------------------------------------------------- validate -----
-
-# ────────────────────── Cboe volatility indices ──────────────────────────────
-def fetch_vol_indices() -> pd.DataFrame:
-    """Daily closes for the Cboe vol complex, plus where each sits in its own
-    52-week range. Percentile matters more than level: VIX 16 means something
-    different in a 12-30 year than in a 15-45 one, and the tracker's putBuy /
-    putThresh bands are range-relative.
-
-    Failure is per-index and never fatal — a missing index is written null so
-    the tracker can keep its sourced-or-null contract."""
-    import time
-    import yfinance as yf
-
-    rows = []
-    for name, sym in VOL_INDICES.items():
-        val = lo = hi = pct = None
-        asof = None
-        try:
-            h = yf.Ticker(sym).history(period=VOL_HISTORY, interval="1d",
-                                       auto_adjust=False)["Close"].dropna()
-            if len(h) >= 30:
-                val = round(float(h.iloc[-1]), 2)
-                lo, hi = round(float(h.min()), 2), round(float(h.max()), 2)
-                pct = round(float((h <= h.iloc[-1]).mean() * 100), 1)
-                asof = pd.to_datetime(h.index[-1]).date().isoformat()
-            else:
-                print(f"  vol {name:<6} only {len(h)} obs — null", file=sys.stderr)
-        except Exception as e:
-            print(f"  vol {name:<6} FAILED: {str(e)[:70]}", file=sys.stderr)
-        rows.append(dict(asof=asof, index=name, symbol=sym, close=val,
-                         pct_52w=pct, lo_52w=lo, hi_52w=hi))
-        time.sleep(PAUSE)
-    return pd.DataFrame(rows)
-
-
-def validate(new: pd.DataFrame, tickers: list) -> dict:
-    """Gate before any write. Returns report; raises SystemExit on failure so
-    the Actions run goes RED instead of silently committing garbage."""
-    rep = {}
-    last = new.iloc[-1]
-    cov = float(last.notna().sum()) / len(tickers)
-    rep["asof"] = str(new.index[-1].date())
-    rep["coverage"] = round(cov, 3)
-    rep["rows"] = int(len(new))
-    rep["missing_tickers"] = [t for t in tickers if t not in new.columns
-                              or pd.isna(last.get(t))]
-
-    fail = []
-    if cov < MIN_COVERAGE:
-        fail.append(f"coverage {cov:.0%} < {MIN_COVERAGE:.0%} "
-                    f"(missing: {rep['missing_tickers']})")
-    if len(new) < MIN_ROWS:
-        fail.append(f"only {len(new)} rows (< {MIN_ROWS})")
-
-    if CLOSES.exists():                                  # regression guard
-        old = pd.read_csv(CLOSES)
-        if len(new) < len(old) - 1:
-            fail.append(f"row count regression {len(old)} -> {len(new)}")
-        # price sanity: no ticker may move >60% w/w (split/bad-tick guard)
-        if len(new) >= 2:
-            chg = (new.iloc[-1] / new.iloc[-2] - 1).abs()
-            wild = chg[chg > 0.60].dropna().index.tolist()
-            if wild:
-                fail.append(f"implausible w/w move: {wild}")
-
-    if fail:
-        print("VALIDATION FAILED — nothing written:", file=sys.stderr)
-        for f in fail:
-            print(f"  - {f}", file=sys.stderr)
-        sys.exit(1)
-    return rep
-
-
-# ----------------------------------------------------------------- main -----
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
-
-    if not CLOSES.exists():
-        sys.exit(f"FATAL: {CLOSES} not found — run from repo root")
-
-    tickers = [c for c in pd.read_csv(CLOSES, nrows=1).columns
-               if c.lower() != "week_ending"]
-    print(f"universe: {len(tickers)} tickers (from existing header)")
-
-    new = fetch_weekly(tickers)
-    new = new.reindex(columns=tickers)          # preserve column order exactly
-    rep = validate(new, tickers)
-    print(f"validated: asof {rep['asof']}, {rep['rows']} rows, "
-          f"coverage {rep['coverage']:.0%}")
-
-    # ---- hull ----
-    rows, near = [], []
-    for t in tickers:
-        c, ht, hp, m, col, nf = hull_row(new[t]) if t in new else (None,) * 6
-        rows.append(dict(asof=rep["asof"], ticker=t, close=c, hma55=ht,
-                         hma55_prev=hp, margin_pct=m, color=col, near_flip=nf))
-        if nf:
-            near.append(f"{t} {m:+.2f}")
-    hull_df = pd.DataFrame(rows)
-
-    if args.dry_run:
-        print("\n--- DRY RUN (nothing written) ---")
-        print(hull_df.to_string(index=False))
-        print("near-flips (CHART-VERIFY):", near or "none")
-        return
-
-    DATA.mkdir(exist_ok=True)
-    new.round(4).to_csv(CLOSES)
-    hull_df.to_csv(HULL, index=False)
-    STATUS.write_text(json.dumps({
-        **rep,
-        "run_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "hull_nulls": [r["ticker"] for r in rows if r["color"] is None],
-        "near_flips": near,
-    }, indent=2))
-
-    # ---- hull3d (independent failure; never blocks the weekly hull) ----
-    try:
-        h3 = build_hull3d(tickers)
-        h3.to_csv(HULL3D, index=False)
-        ok = int(h3["color"].notna().sum())
-        a3 = h3["asof"].dropna().max()
-        print(f"WROTE {HULL3D} ({ok}/{len(h3)} tickers, asof {a3})")
-        print(f"\nHULL3D BOARD (asof {a3}) [{EST_FLAG_3D}]:")
-        for _, r in h3.iterrows():
-            if pd.notna(r["color"]):
-                flag = "  **NEAR**" if r["near_flip"] else ""
-                print(f"  {r['ticker']:<8}{r['color']:<6}{r['margin_pct']:+.2f}{flag}")
-            else:
-                print(f"  {r['ticker']:<8}null")
-        # disagreement with the weekly read is the whole point of running both
-        wk = {r["ticker"]: r["color"] for r in rows if r["color"]}
-        diff = [f"{r['ticker']} 3D:{r['color']} vs W:{wk[r['ticker']]}"
-                for _, r in h3.iterrows()
-                if pd.notna(r["color"]) and wk.get(r["ticker"])
-                and r["color"] != wk[r["ticker"]]]
-        print(f"3D-vs-WEEKLY disagreements ({len(diff)}): {diff or 'none'}")
-    except Exception as e:
-        print(f"hull3d block failed (non-fatal): {str(e)[:140]}", file=sys.stderr)
-
-    # ---- Cboe vol indices (independent failure; never blocks the price run) ----
-    try:
-        vol = fetch_vol_indices()
-        vol.to_csv(VOLIDX, index=False)
-        ok = vol["close"].notna().sum()
-        print(f"WROTE {VOLIDX} ({ok}/{len(vol)} indices)")
-        print("\nVOL INDICES:")
-        for _, v in vol.iterrows():
-            if pd.notna(v["close"]):
-                print(f"  {v['index']:<7}{v['close']:>7.2f}  {v['pct_52w']:>5.1f}%ile"
-                      f"  range {v['lo_52w']}-{v['hi_52w']}  asof {v['asof']}")
-            else:
-                print(f"  {v['index']:<7}   null")
-    except Exception as e:
-        print(f"vol indices block failed (non-fatal): {str(e)[:120]}", file=sys.stderr)
-
-    print(f"WROTE {CLOSES} / {HULL} / {STATUS}")
-    print("near-flips (CHART-VERIFY per hysteresis rule):", near or "none")
-
-    # Full board in the run's own log. The committed CSV can sit behind a CDN
-    # cache for several minutes after a push, so the log must be sufficient on
-    # its own to reconstruct every signal without a second channel.
-    print(f"\nHULL BOARD (asof {rep['asof']}):")
-    for r in rows:
-        if r["color"]:
-            flag = "  **NEAR**" if r["near_flip"] else ""
-            print(f"  {r['ticker']:<8}{r['color']:<6}{r['margin_pct']:+.2f}{flag}")
-        else:
-            print(f"  {r['ticker']:<8}null")
-
-
-if __name__ == "__main__":
-    main()
+name: weekly-prices
+
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      diagnose_only:
+        description: "true = ตรวจ git index อย่างเดียว ไม่ยิง Yahoo เลย"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── ตรวจ git index ก่อนทำอะไรทั้งสิ้น ────────────────────────────────
+      # assume-unchanged (h) / skip-worktree (S) ทำให้ `git add -A` ข้ามไฟล์
+      # แบบเงียบสนิท ไม่มี error ไม่มี exit code — เป็นสมมติฐานอันดับหนึ่ง
+      # ของอาการ _status.json ขึ้น main แต่ CSV ไม่ขึ้น
+      - name: Diagnose git index
+        run: |
+          set -euo pipefail
+          echo "=== git ls-files -v data/ (H = ปกติ, h/S = จะถูกข้ามเงียบ) ==="
+          git ls-files -v data/
+          echo
+          echo "=== ไฟล์ที่ถูก mark ข้าม ==="
+          git ls-files -v data/ | grep -v '^H ' || echo "(ไม่มี — index สะอาด)"
+          echo
+          echo "=== .gitignore ที่จับ data/ ==="
+          git check-ignore -v data/*.csv data/*.json || echo "(ไม่มีอะไรถูก ignore)"
+          echo
+          echo "=== commit ล่าสุดที่แตะ data/ ==="
+          git log -10 --format='%cI %h %s' --name-only -- data/
+
+      - name: Stop here if diagnosing
+        if: github.event.inputs.diagnose_only == 'true'
+        run: |
+          echo "diagnose_only=true — จบงาน ไม่มี request ไปหา Yahoo แม้แต่ครั้งเดียว"
+          exit 0
+
+      - uses: actions/setup-python@v5
+        if: github.event.inputs.diagnose_only != 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        if: github.event.inputs.diagnose_only != 'true'
+        run: pip install "yfinance==0.2.66" pandas numpy requests lxml html5lib
+
+      - name: Build weekly closes + hull
+        if: github.event.inputs.diagnose_only != 'true'
+        run: python build_weekly.py
+
+      # macro ล้มได้โดยไม่บล็อกราคา/Hull ที่สำเร็จแล้ว
+      - name: Build macro series
+        if: github.event.inputs.diagnose_only != 'true'
+        continue-on-error: true
+        timeout-minutes: 12
+        run: python build_macro.py
+
+      # ── commit: ทุก error ต้องดัง ห้ามกลบ ────────────────────────────────
+      - name: Commit outputs
+        if: always() && github.event.inputs.diagnose_only != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name  "price-bot"
+          git config user.email "actions@github.com"
+
+          echo "=== ไฟล์บนดิสก์หลัง build ==="
+          ls -la data/
+
+          echo "=== worktree status (ก่อน add) ==="
+          git status --porcelain
+
+          # ไม่มี 2>/dev/null และไม่มี || true — add ล้มเมื่อไหร่ต้องเห็น
+          git add -A data/
+
+          echo "=== staged ==="
+          git diff --cached --name-only
+
+          if git diff --cached --quiet; then
+            echo "::error::ไม่มีอะไร staged ทั้งที่ build เขียนไฟล์ไปแล้ว — index ถูก mark ข้าม หรือโดน .gitignore ดูผลจาก step 'Diagnose git index'"
+            exit 1
+          fi
+
+          git commit -m "prices+macro $(date -u +%F)"
+
+          # ไม่มี --autostash: ไฟล์ที่ add ไม่ติดจะไม่ถูกซ่อนเข้า stash แล้วหาย
+          # ไปพร้อม runner อีกต่อไป ถ้า worktree สกปรกให้ล้มดัง ๆ
+          git pull --rebase origin main
+          git push
+
+          echo "=== ยืนยันว่าลง origin จริง (ไม่ใช่แค่บน runner) ==="
+          git fetch origin main
+          for f in data/_status.json data/weekly_closes.csv data/hull_weekly.csv data/vol_indices.csv; do
+            if git cat-file -e "origin/main:$f" 2>/dev/null; then
+              sz=$(git cat-file -s "origin/main:$f")
+              echo "  OK   $f (${sz} bytes on origin)"
+            else
+              echo "::error::$f ไม่มีบน origin/main หลัง push"
+              exit 1
+            fi
+          done
+
+      # ── alarm: ต้องอ่านจาก origin ไม่ใช่จากดิสก์ของ runner ───────────────
+      - name: Staleness alarm
+        if: always() && github.event.inputs.diagnose_only != 'true'
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          from datetime import datetime, timezone
+
+          fail = []
+
+          def from_origin(path):
+              """อ่านจาก origin/main เท่านั้น การอ่าน data/_status.json จากดิสก์
+              คือการให้ alarm ตรวจไฟล์ที่ build_weekly.py เพิ่งเขียนเอง —
+              age จะเป็น 0 เสมอ และ alarm จะเขียวแม้ push ล้มทั้งหมด"""
+              subprocess.run(["git", "fetch", "-q", "origin", "main"], check=False)
+              return json.loads(subprocess.check_output(
+                  ["git", "show", f"origin/main:{path}"], text=True))
+
+          try:
+              st = from_origin("data/_status.json")
+          except Exception as e:
+              print(f"::error::อ่าน _status.json จาก origin ไม่ได้: {e}")
+              sys.exit(1)
+
+          age = (datetime.now(timezone.utc).date()
+                 - datetime.strptime(st["asof"], "%Y-%m-%d").date()).days
+          print(f"prices  asof={st['asof']} age={age}d coverage={st['coverage']:.0%} "
+                f"rows={st.get('rows')} run_utc={st.get('run_utc')}")
+          if age > 8:
+              fail.append(f"prices stale {age}d")
+          if st.get("coverage", 0) < 0.90:
+              fail.append(f"coverage {st['coverage']:.0%} < 90%")
+
+          # ตรวจว่า CSV ตามหลัง _status.json หรือไม่ — อาการ 2026-08 เป๊ะ ๆ
+          try:
+              hull = subprocess.check_output(
+                  ["git", "show", "origin/main:data/hull_weekly.csv"], text=True)
+              hull_asof = hull.splitlines()[1].split(",")[0]
+              print(f"hull_weekly.csv asof={hull_asof}")
+              if hull_asof != st["asof"]:
+                  fail.append(f"hull_weekly.csv asof {hull_asof} != _status.json "
+                              f"{st['asof']} — CSV ไม่ได้ถูก commit")
+          except Exception as e:
+              print(f"::warning::อ่าน hull_weekly.csv ไม่ได้: {e}")
+
+          try:
+              ms = from_origin("data/_macro_status.json")
+              print(f"macro   series_ok={ms['series_ok']}/{ms['series_total']} "
+                    f"latest_friday={ms['latest_friday']} stale={ms['stale_series']}")
+              b = ms.get("breadth", {})
+              print(f"breadth status={b.get('status')} asof={b.get('asof')} "
+                    f"universe={b.get('universe')} "
+                    f"200dma={b.get('pct_above_200dma')} 50dma={b.get('pct_above_50dma')}")
+              if b.get("hysteresis_warning"):
+                  print("::warning::breadth within 3pt of a threshold — chart-verify")
+              if ms["failed"]:
+                  print(f"::warning::macro series failed: {ms['failed']}")
+          except Exception:
+              print("::warning::macro status ไม่มีบน origin — macro step ไม่สำเร็จ")
+
+          for f in fail:
+              print(f"::error::{f}")
+          sys.exit(1 if fail else 0)
+          PY

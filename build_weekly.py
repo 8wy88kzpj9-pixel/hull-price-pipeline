@@ -367,7 +367,7 @@ def fetch_weekly(tickers: list) -> pd.DataFrame:
 # ------------------------------------------------------------- validate -----
 
 # ────────────────────── Cboe volatility indices ──────────────────────────────
-def fetch_vol_indices() -> pd.DataFrame:
+def fetch_vol_indices() -> tuple:
     """Daily closes for the Cboe vol complex, plus where each sits in its own
     52-week range. Percentile matters more than level: VIX 16 means something
     different in a 12-30 year than in a 15-45 one, and the tracker's putBuy /
@@ -478,7 +478,9 @@ def drop_incomplete_week(df: pd.DataFrame) -> pd.DataFrame:
               f"(ปิดจริง {(df.index[-1] + pd.Timedelta(hours=21))} UTC)")
         df = df.iloc[:-1]
     if df.empty:
-        sys.exit("FATAL: ไม่เหลือสัปดาห์ที่ปิดแล้วเลย — ไม่เขียนอะไรทั้งสิ้น")
+        # ต้องเป็น RuntimeError ไม่ใช่ sys.exit: SystemExit สืบทอดจาก BaseException
+        # จึงทะลุ `except Exception` ของ vol block ที่ระบุว่า non-fatal แล้วฆ่าทั้ง run
+        raise RuntimeError("ไม่เหลือสัปดาห์ที่ปิดแล้วเลย")
     return df
 
 
@@ -535,7 +537,10 @@ def main() -> None:
 
     new = fetch_weekly(tickers)
     new = new.reindex(columns=tickers)          # preserve column order exactly
-    new = drop_incomplete_week(new)             # v1.8: กันกระดานผีจากแท่งครึ่งใบ
+    try:                                        # v1.8: กันกระดานผีจากแท่งครึ่งใบ
+        new = drop_incomplete_week(new)
+    except RuntimeError as e:
+        sys.exit(f"FATAL: {e} — ไม่เขียนอะไรทั้งสิ้น")
     rep = validate(new, tickers)
     print(f"validated: asof {rep['asof']}, {rep['rows']} rows, "
           f"coverage {rep['coverage']:.0%}")

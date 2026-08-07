@@ -98,8 +98,9 @@ jobs:
           git diff --cached --name-only
 
           if git diff --cached --quiet; then
-            echo "::error::ไม่มีอะไร staged ทั้งที่ build เขียนไฟล์ไปแล้ว — index ถูก mark ข้าม หรือโดน .gitignore ดูผลจาก step 'Diagnose git index'"
-            exit 1
+            echo "::notice::data/ ไม่เปลี่ยน — ปกติสำหรับรอบสำรองวันอาทิตย์ที่ได้แท่งศุกร์เดียวกับรอบเสาร์"
+            echo "ข้าม commit/push · Staleness alarm จะตรวจ origin ต่อไปตามปกติ"
+            exit 0
           fi
 
           git commit -m "prices+macro $(date -u +%F)"

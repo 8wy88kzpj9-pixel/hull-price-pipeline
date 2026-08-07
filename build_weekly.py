@@ -272,7 +272,7 @@ def build_hull3d(tickers: list) -> pd.DataFrame:
         bars_used = 0
         asof = None
         if t in daily:
-            bars = to_3d_closes(daily[t])
+            bars = to_3d_closes(drop_incomplete_day(daily[t]))
             bars_used = int(bars.dropna().shape[0])
             if bars_used:
                 asof = pd.to_datetime(bars.index.max()).date().isoformat()
@@ -484,6 +484,60 @@ def drop_incomplete_week(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def drop_incomplete_day(s: pd.Series) -> pd.Series:
+    """ตัดแท่งรายวันของวันที่ยังไม่ปิดออก ก่อนจัดกลุ่มเป็นแท่ง 3 วัน
+
+    to_3d_closes() หยิบ 3 วันทำการล่าสุดมาเป็นแท่งใหม่สุดเสมอ ถ้ารันตอนตลาด
+    ยังเปิดอยู่ วันนั้นเป็นราคากลางคัน แท่ง 3 วันจึงปนราคาที่ยังไม่นิ่ง —
+    โรคเดียวกับ drop_incomplete_week() ในฝั่ง weekly
+
+    cron เสาร์/อาทิตย์ไม่เจอปัญหานี้ แต่ workflow_dispatch กลางสัปดาห์เจอเต็ม ๆ"""
+    now = pd.Timestamp(datetime.now(timezone.utc).replace(tzinfo=None))
+    idx = pd.to_datetime(s.index)
+    try:
+        idx = idx.tz_localize(None)
+    except TypeError:
+        idx = idx.tz_convert(None)
+    out = pd.Series(s.values, index=idx).sort_index()
+    while len(out) and (out.index[-1].normalize() + pd.Timedelta(hours=21)) > now:
+        out = out.iloc[:-1]
+    return out
+
+
+def append_hull3d_history(h3: pd.DataFrame, weekly_colors: dict) -> tuple:
+    """สะสม hull3d ลงไฟล์แทนการเขียนทับ — upsert ตาม (asof, ticker)
+
+    v1.5-v1.9 เขียนทับทุกรอบ เหลือ snapshot แถวเดียวต่อ ticker ผลคือรันสำเร็จ
+    มาตั้งแต่ 2026-08-04 แต่ประวัติที่ใช้ปลดธง est_flag ยังเป็นศูนย์ ทั้งที่
+    parallel-validation ต้องเทียบ 3D กับ weekly ย้อนหลังสี่สัปดาห์
+
+    บันทึก weekly_color ในแถวเดียวกันด้วย เพื่อให้เทียบย้อนหลังได้จากไฟล์เดียว
+    ไม่ต้องประกบสองไฟล์ทีหลัง"""
+    cur = h3.copy()
+    cur["weekly_color"] = cur["ticker"].map(weekly_colors)
+    cur["agree"] = [
+        None if (pd.isna(r["color"]) or not r["weekly_color"])
+        else bool(r["color"] == r["weekly_color"])
+        for _, r in cur.iterrows()
+    ]
+
+    before = 0
+    if HULL3D.exists():
+        old = pd.read_csv(HULL3D)
+        if "asof" in old.columns and "ticker" in old.columns:
+            before = len(old)
+            keep = cur["asof"].dropna().unique().tolist()
+            old = old[~old["asof"].isin(keep)]          # upsert: รอบเดิมวันเดียวกันถูกแทน
+            cur = pd.concat([old, cur], ignore_index=True)
+
+    cur = cur.sort_values(["asof", "ticker"], na_position="last").reset_index(drop=True)
+    cur.to_csv(HULL3D, index=False)
+    weeks = cur["asof"].nunique()
+    agree = cur[cur["agree"].notna()]["agree"]
+    rate = f"{agree.mean()*100:.0f}%" if len(agree) else "n/a"
+    return before, len(cur), weeks, rate
+
+
 def validate(new: pd.DataFrame, tickers: list) -> dict:
     """Gate before any write. Returns report; raises SystemExit on failure so
     the Actions run goes RED instead of silently committing garbage."""
@@ -574,10 +628,12 @@ def main() -> None:
     # ---- hull3d (independent failure; never blocks the weekly hull) ----
     try:
         h3 = build_hull3d(tickers)
-        h3.to_csv(HULL3D, index=False)
         ok = int(h3["color"].notna().sum())
         a3 = h3["asof"].dropna().max()
-        print(f"WROTE {HULL3D} ({ok}/{len(h3)} tickers, asof {a3})")
+        wk_colors = {r["ticker"]: r["color"] for r in rows if r["color"]}
+        n0, n1, weeks, rate = append_hull3d_history(h3, wk_colors)
+        print(f"WROTE {HULL3D} ({ok}/{len(h3)} tickers, asof {a3}) "
+              f"| ประวัติสะสม {n0} -> {n1} แถว, {weeks} วันที่, ตรงกับ weekly {rate}")
         print(f"\nHULL3D BOARD (asof {a3}) [{EST_FLAG_3D}]:")
         for _, r in h3.iterrows():
             if pd.notna(r["color"]):

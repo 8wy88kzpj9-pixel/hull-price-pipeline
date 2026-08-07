@@ -2,7 +2,13 @@ name: weekly-prices
 
 on:
   schedule:
-    - cron: "30 22 * * 1-5"
+    # เดิม "30 22 * * 1-5" = ยิง Yahoo 5 รอบ/สัปดาห์ วันละ ~60-70 requests
+    # ทั้งที่ระบบใช้แค่แท่งปิดวันศุกร์ — 4 รอบเป็นการเผา quota เปล่า
+    # เวลาเป็น UTC ทั้งคู่ (ICT = UTC+7)
+    - cron: "0 2 * * 6"   # เสาร์ 09:00 ICT — รอบหลัก หลังปิดตลาดศุกร์ US แล้ว
+    - cron: "0 6 * * 0"   # อาทิตย์ 13:00 ICT — รอบสำรอง เผื่อเสาร์ล้ม
+                          # idempotent rebuild ทำให้รอบสำรองเก็บตกได้เอง
+                          # และเสร็จก่อน splice Hartnett ตอนค่ำ ~6 ชม.
   workflow_dispatch:
     inputs:
       diagnose_only:
@@ -19,6 +25,12 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          # checkout ค่าเริ่มต้นคือ fetch-depth: 1 = clone แค่ commit เดียว
+          # ผลคือ git log มองไม่เห็นประวัติ และ `git pull --rebase` ทำงานบน
+          # ประวัติที่ขาด — commit ที่เพิ่งสร้างหลุดหายระหว่าง rebase ได้เงียบ ๆ
+          # แล้ว push ก็สำเร็จโดยไม่มีอะไรถูกส่ง
+          fetch-depth: 0
 
       # ── ตรวจ git index ก่อนทำอะไรทั้งสิ้น ────────────────────────────────
       # assume-unchanged (h) / skip-worktree (S) ทำให้ `git add -A` ข้ามไฟล์

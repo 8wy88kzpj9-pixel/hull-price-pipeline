@@ -3,7 +3,12 @@ name: weekly-prices
 on:
   schedule:
     - cron: "30 22 * * 1-5"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      diagnose_only:
+        description: "true = ตรวจ git index อย่างเดียว ไม่ยิง Yahoo เลย"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -15,49 +20,142 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── ตรวจ git index ก่อนทำอะไรทั้งสิ้น ────────────────────────────────
+      # assume-unchanged (h) / skip-worktree (S) ทำให้ `git add -A` ข้ามไฟล์
+      # แบบเงียบสนิท ไม่มี error ไม่มี exit code — เป็นสมมติฐานอันดับหนึ่ง
+      # ของอาการ _status.json ขึ้น main แต่ CSV ไม่ขึ้น
+      - name: Diagnose git index
+        run: |
+          set -euo pipefail
+          echo "=== git ls-files -v data/ (H = ปกติ, h/S = จะถูกข้ามเงียบ) ==="
+          git ls-files -v data/
+          echo
+          echo "=== ไฟล์ที่ถูก mark ข้าม ==="
+          git ls-files -v data/ | grep -v '^H ' || echo "(ไม่มี — index สะอาด)"
+          echo
+          echo "=== .gitignore ที่จับ data/ ==="
+          git check-ignore -v data/*.csv data/*.json || echo "(ไม่มีอะไรถูก ignore)"
+          echo
+          echo "=== commit ล่าสุดที่แตะ data/ ==="
+          git log -10 --format='%cI %h %s' --name-only -- data/
+
+      - name: Stop here if diagnosing
+        if: github.event.inputs.diagnose_only == 'true'
+        run: |
+          echo "diagnose_only=true — จบงาน ไม่มี request ไปหา Yahoo แม้แต่ครั้งเดียว"
+          exit 0
+
       - uses: actions/setup-python@v5
+        if: github.event.inputs.diagnose_only != 'true'
         with:
           python-version: "3.12"
 
       - name: Install deps
+        if: github.event.inputs.diagnose_only != 'true'
         run: pip install "yfinance==0.2.66" pandas numpy requests lxml html5lib
 
       - name: Build weekly closes + hull
+        if: github.event.inputs.diagnose_only != 'true'
         run: python build_weekly.py
 
       # macro ล้มได้โดยไม่บล็อกราคา/Hull ที่สำเร็จแล้ว
       - name: Build macro series
+        if: github.event.inputs.diagnose_only != 'true'
         continue-on-error: true
         timeout-minutes: 12
         run: python build_macro.py
 
+      # ── commit: ทุก error ต้องดัง ห้ามกลบ ────────────────────────────────
       - name: Commit outputs
-        if: always()
+        if: always() && github.event.inputs.diagnose_only != 'true'
         run: |
+          set -euo pipefail
           git config user.name  "price-bot"
           git config user.email "actions@github.com"
-          git add -A data/ 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "prices+macro $(date -u +%F)"
-          git pull --rebase --autostash origin main
+
+          echo "=== ไฟล์บนดิสก์หลัง build ==="
+          ls -la data/
+
+          echo "=== worktree status (ก่อน add) ==="
+          git status --porcelain
+
+          # ไม่มี 2>/dev/null และไม่มี || true — add ล้มเมื่อไหร่ต้องเห็น
+          git add -A data/
+
+          echo "=== staged ==="
+          git diff --cached --name-only
+
+          if git diff --cached --quiet; then
+            echo "::error::ไม่มีอะไร staged ทั้งที่ build เขียนไฟล์ไปแล้ว — index ถูก mark ข้าม หรือโดน .gitignore ดูผลจาก step 'Diagnose git index'"
+            exit 1
+          fi
+
+          git commit -m "prices+macro $(date -u +%F)"
+
+          # ไม่มี --autostash: ไฟล์ที่ add ไม่ติดจะไม่ถูกซ่อนเข้า stash แล้วหาย
+          # ไปพร้อม runner อีกต่อไป ถ้า worktree สกปรกให้ล้มดัง ๆ
+          git pull --rebase origin main
           git push
 
+          echo "=== ยืนยันว่าลง origin จริง (ไม่ใช่แค่บน runner) ==="
+          git fetch origin main
+          for f in data/_status.json data/weekly_closes.csv data/hull_weekly.csv data/vol_indices.csv; do
+            if git cat-file -e "origin/main:$f" 2>/dev/null; then
+              sz=$(git cat-file -s "origin/main:$f")
+              echo "  OK   $f (${sz} bytes on origin)"
+            else
+              echo "::error::$f ไม่มีบน origin/main หลัง push"
+              exit 1
+            fi
+          done
+
+      # ── alarm: ต้องอ่านจาก origin ไม่ใช่จากดิสก์ของ runner ───────────────
       - name: Staleness alarm
+        if: always() && github.event.inputs.diagnose_only != 'true'
         run: |
           python - <<'PY'
-          import json, sys
+          import json, subprocess, sys
           from datetime import datetime, timezone
 
           fail = []
 
-          st = json.load(open("data/_status.json"))
-          age = (datetime.now(timezone.utc).date()
-                 - datetime.strptime(st["asof"], "%Y-%m-%d").date()).days
-          print(f"prices  asof={st['asof']} age={age}d coverage={st['coverage']:.0%}")
-          if age > 8:
-              fail.append(f"prices stale {age}d")
+          def from_origin(path):
+              """อ่านจาก origin/main เท่านั้น การอ่าน data/_status.json จากดิสก์
+              คือการให้ alarm ตรวจไฟล์ที่ build_weekly.py เพิ่งเขียนเอง —
+              age จะเป็น 0 เสมอ และ alarm จะเขียวแม้ push ล้มทั้งหมด"""
+              subprocess.run(["git", "fetch", "-q", "origin", "main"], check=False)
+              return json.loads(subprocess.check_output(
+                  ["git", "show", f"origin/main:{path}"], text=True))
 
           try:
-              ms = json.load(open("data/_macro_status.json"))
+              st = from_origin("data/_status.json")
+          except Exception as e:
+              print(f"::error::อ่าน _status.json จาก origin ไม่ได้: {e}")
+              sys.exit(1)
+
+          age = (datetime.now(timezone.utc).date()
+                 - datetime.strptime(st["asof"], "%Y-%m-%d").date()).days
+          print(f"prices  asof={st['asof']} age={age}d coverage={st['coverage']:.0%} "
+                f"rows={st.get('rows')} run_utc={st.get('run_utc')}")
+          if age > 8:
+              fail.append(f"prices stale {age}d")
+          if st.get("coverage", 0) < 0.90:
+              fail.append(f"coverage {st['coverage']:.0%} < 90%")
+
+          # ตรวจว่า CSV ตามหลัง _status.json หรือไม่ — อาการ 2026-08 เป๊ะ ๆ
+          try:
+              hull = subprocess.check_output(
+                  ["git", "show", "origin/main:data/hull_weekly.csv"], text=True)
+              hull_asof = hull.splitlines()[1].split(",")[0]
+              print(f"hull_weekly.csv asof={hull_asof}")
+              if hull_asof != st["asof"]:
+                  fail.append(f"hull_weekly.csv asof {hull_asof} != _status.json "
+                              f"{st['asof']} — CSV ไม่ได้ถูก commit")
+          except Exception as e:
+              print(f"::warning::อ่าน hull_weekly.csv ไม่ได้: {e}")
+
+          try:
+              ms = from_origin("data/_macro_status.json")
               print(f"macro   series_ok={ms['series_ok']}/{ms['series_total']} "
                     f"latest_friday={ms['latest_friday']} stale={ms['stale_series']}")
               b = ms.get("breadth", {})
@@ -68,8 +166,8 @@ jobs:
                   print("::warning::breadth within 3pt of a threshold — chart-verify")
               if ms["failed"]:
                   print(f"::warning::macro series failed: {ms['failed']}")
-          except FileNotFoundError:
-              print("::warning::macro status file missing — macro step did not complete")
+          except Exception:
+              print("::warning::macro status ไม่มีบน origin — macro step ไม่สำเร็จ")
 
           for f in fail:
               print(f"::error::{f}")

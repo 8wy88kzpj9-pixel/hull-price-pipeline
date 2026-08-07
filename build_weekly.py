@@ -41,6 +41,16 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.8: drop_incomplete_week() — ตัดแท่งสัปดาห์ที่ยังไม่ปิดก่อนคำนวณ Hull
+      cron เดิม (จ.-ศ.) ทำให้ 4 ใน 5 รอบผลิตกระดานจากแท่งครึ่งใบ และ
+      validate() จับไม่ได้เพราะ coverage ยังขึ้น 100% ทุก ticker มีค่าครบ
+      แค่เป็นค่ากลางสัปดาห์ ยืนยันด้วยการวัดจริง 2026-08-07: INDA พลิก
+      -0.05 -> +0.04 เพราะรันตอนตลาด US ยังไม่เปิด
+v1.9: vol_indices.csv rebuild เต็มไฟล์จากรายวัน 2y (idempotent) แทน upsert
+      v1.6 เขียน snapshot long ทับประวัติ wide สำเร็จจริง 2026-08-07T01:50Z
+      (f61ae7e) ประวัติตั้งแต่ 2025-05-16 หายเกลี้ยง rebuild กู้คืนได้เองโดย
+      ไม่ต้องขุด git · เพิ่ม VVIX กลับเข้า VOL_INDICES (เคยอยู่ในไฟล์เดิมแต่
+      ไม่เคยถูกดึง) · percentile คิดจาก 252 วันล่าสุดเท่านั้น ไม่ใช่ทั้ง 2y
 v1.7: vol_indices.csv is now UPSERTED, not overwritten. v1.4-1.6 wrote the long
       snapshot straight over a wide week_ending x index history — one successful
       run would have destroyed every vol level back to 2025-05-16, silently,
@@ -130,9 +140,11 @@ VOL_INDICES = {
     "VXEWZ": "^VXEWZ",    # Brazil (EWZ) 30d IV -> em_brazil
     "VXEFA": "^VXEFA",    # EAFE 30d IV         -> japan/europe (REGIONAL proxy)
     "VXHYG": "^VXHYG",    # HY credit 30d IV    -> bonds
+    "VVIX": "^VVIX",      # vol-of-vol          -> เคยอยู่ในไฟล์เดิม ต้องดึงเองไม่งั้นหาย
     "SKEW": "^SKEW",      # tail-risk pricing   -> context only, not an IV
 }
-VOL_HISTORY = "1y"      # enough for a 52-week percentile
+VOL_HISTORY = "2y"      # v1.9: rebuild ประวัติ weekly ทั้งชุดจากรายวัน
+                        # ไฟล์เดิมเริ่ม 2025-05-16 — 2y ครอบคลุมเกินนั้น
 
 # Column name in weekly_closes.csv -> yfinance symbol. Column names are the
 # system of record (tracker/TICKER_MAP read them); only the fetch layer needs
@@ -367,6 +379,7 @@ def fetch_vol_indices() -> pd.DataFrame:
     import yfinance as yf
 
     rows = []
+    daily = {}
     for name, sym in VOL_INDICES.items():
         val = lo = hi = pct = None
         asof = None
@@ -374,9 +387,11 @@ def fetch_vol_indices() -> pd.DataFrame:
             h = yf.Ticker(sym).history(period=VOL_HISTORY, interval="1d",
                                        auto_adjust=False)["Close"].dropna()
             if len(h) >= 30:
+                daily[name] = h
+                w52 = h.iloc[-252:] if len(h) > 252 else h   # percentile = 52wk เท่านั้น
                 val = round(float(h.iloc[-1]), 2)
-                lo, hi = round(float(h.min()), 2), round(float(h.max()), 2)
-                pct = round(float((h <= h.iloc[-1]).mean() * 100), 1)
+                lo, hi = round(float(w52.min()), 2), round(float(w52.max()), 2)
+                pct = round(float((w52 <= h.iloc[-1]).mean() * 100), 1)
                 asof = pd.to_datetime(h.index[-1]).date().isoformat()
             else:
                 print(f"  vol {name:<6} only {len(h)} obs — null", file=sys.stderr)
@@ -385,72 +400,86 @@ def fetch_vol_indices() -> pd.DataFrame:
         rows.append(dict(asof=asof, index=name, symbol=sym, close=val,
                          pct_52w=pct, lo_52w=lo, hi_52w=hi))
         time.sleep(PAUSE)
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), daily
 
 
-def upsert_vol_history(vol: pd.DataFrame) -> tuple:
-    """Merge today's snapshot into the WIDE vol history, never overwrite it.
+def rebuild_vol_history(daily: dict) -> tuple:
+    """สร้าง data/vol_indices.csv ใหม่ทั้งไฟล์จากข้อมูลรายวัน — idempotent
 
-    v1.6 wrote the long snapshot straight over vol_indices.csv. The file on disk
-    is a wide week_ending x index history going back to 2025-05-16; a single
-    successful run would therefore have destroyed ~60 weeks of VIX/VXN/GVZ/OVX/
-    VVIX levels and replaced them with 11 rows. The block is wrapped in a
-    non-fatal try/except, so nothing would have said a word.
+    ทำไมต้อง rebuild ไม่ใช่ upsert: v1.4-v1.6 เขียน snapshot รูปแบบ long ทับ
+    ไฟล์ประวัติรูปแบบ wide ทั้งไฟล์ ทำสำเร็จจริงเมื่อ 2026-08-07T01:50Z
+    (commit f61ae7e) ประวัติตั้งแต่ 2025-05-16 หายทั้งหมด เหลือ 11 แถว
+    และเพราะ block นี้เป็น non-fatal จึงไม่มีสัญญาณอะไรเลย
 
-    Rules:
-      · existing columns are never dropped (VVIX has no Yahoo symbol here and
-        must survive as history even though it is no longer fetched)
-      · new columns are appended
-      · the row is keyed by the FRIDAY of the snapshot week, matching the
-        week_ending convention used by weekly_closes.csv
-      · a week already present is updated in place, not duplicated
-      · a null fetch writes nothing over a good prior value
+    upsert แก้อาการ แต่ไม่กู้ของที่หายไปแล้ว rebuild จากรายวัน 2y กู้คืนได้
+    ทั้งหมดโดยไม่ต้องขุด git และป้องกันไม่ให้เกิดซ้ำได้ถาวร — หลักการเดียว
+    กับ weekly_closes.csv ที่ docstring หัวไฟล์อธิบายไว้
+
+    คอลัมน์ที่ดึงไม่ได้จะถูกรักษาไว้จากไฟล์เดิม (combine_first) ไม่ทับด้วย null
     """
-    live = {r["index"]: r["close"] for _, r in vol.iterrows()
-            if pd.notna(r["close"])}
-    if not live:
-        raise RuntimeError("every vol index returned null — refusing to touch history")
+    if not daily:
+        raise RuntimeError("ไม่มี index ไหนคืนข้อมูลรายวันเลย — ไม่แตะไฟล์")
 
-    asofs = pd.to_datetime(vol["asof"].dropna())
-    if asofs.empty:
-        raise RuntimeError("no asof date on any vol index — refusing to touch history")
-    d = asofs.max()
-    friday = (d - pd.Timedelta(days=int(d.weekday()))
-              + pd.Timedelta(days=4)).date().isoformat()
+    cols = {}
+    for name, s in daily.items():
+        idx = pd.to_datetime(s.index)
+        try:
+            idx = idx.tz_localize(None)
+        except TypeError:
+            idx = idx.tz_convert(None)
+        ser = pd.Series(s.values, index=idx).sort_index()
+        cols[name] = ser.resample("W-FRI").last().dropna().round(2)
 
+    new = pd.DataFrame(cols)
+    new.index = pd.to_datetime(new.index).normalize()
+    new.index.name = "week_ending"
+    new = drop_incomplete_week(new)          # แท่งสัปดาห์ปัจจุบันยังไม่ปิด
+
+    before = 0
     if VOLIDX.exists():
-        hist = pd.read_csv(VOLIDX)
-        if "week_ending" not in hist.columns:
-            raise RuntimeError(
-                f"{VOLIDX} has no week_ending column (cols={list(hist.columns)[:6]}) "
-                "— schema mismatch, refusing to write")
-        before = len(hist)
-    else:
-        hist = pd.DataFrame(columns=["week_ending"])
-        before = 0
+        old = pd.read_csv(VOLIDX)
+        if "week_ending" in old.columns:     # ไฟล์รูปแบบ wide เดิม -> รักษาไว้
+            old["week_ending"] = pd.to_datetime(old["week_ending"])
+            old = old.set_index("week_ending").sort_index()
+            before = len(old)
+            new = new.combine_first(old)     # ค่าใหม่ชนะ ของเดิมเติมช่องว่าง
+        else:                                # ไฟล์ long ที่ถูกเขียนทับ -> ทิ้ง
+            print(f"  {VOLIDX} เป็น schema snapshot (cols={list(old.columns)[:4]}) "
+                  f"— สร้างประวัติใหม่ทับ", file=sys.stderr)
 
-    for col in live:
-        if col not in hist.columns:
-            hist[col] = pd.NA
+    new = new.sort_index()
+    new.index.name = "week_ending"
+    new.to_csv(VOLIDX)
+    return len(new), before, str(new.index[-1].date())
 
-    hist["week_ending"] = hist["week_ending"].astype(str)
-    if friday in set(hist["week_ending"]):
-        i = hist.index[hist["week_ending"] == friday][0]
-        action = "updated"
-    else:
-        hist.loc[len(hist), "week_ending"] = friday
-        i = hist.index[-1]
-        action = "appended"
-    for col, val in live.items():
-        hist.at[i, col] = val
 
-    hist = hist.sort_values("week_ending").reset_index(drop=True)
+def drop_incomplete_week(df: pd.DataFrame) -> pd.DataFrame:
+    """ตัดแท่งสัปดาห์ที่ยังไม่ปิดทิ้ง ก่อนคำนวณ Hull
 
-    if len(hist) < before:
-        raise RuntimeError(f"row regression {before} -> {len(hist)} — refusing to write")
+    yfinance คืนแท่งของสัปดาห์ที่กำลังเดินอยู่ด้วย สคริปต์ติดป้ายเป็นวันศุกร์
+    ผลคือรันวันพุธจะได้แถว 'ศุกร์' ที่มีแค่ราคาปิด จ.-อ. แล้ว HMA55 ถูกคำนวณ
+    ทับลงบนแท่งครึ่งใบ — coverage ยังขึ้น 100% เพราะทุก ticker มีค่า
+    gate เดิมจึงจับไม่ได้เลย
 
-    hist.to_csv(VOLIDX, index=False)
-    return friday, action, before, len(hist)
+    วัดผลจริง 2026-08-07 (รันเช้าวันศุกร์ ตลาด US ยังไม่เปิด):
+        INDA -0.05 -> +0.04  (พลิกสี)
+        XLY  -0.19 -> -0.09
+        IWF  +0.17 -> +0.24
+    ทั้งหมดเป็นสัญญาณผีจากแท่งที่ยังไม่จบ
+
+    แท่งที่ป้ายเป็นศุกร์ F ถือว่าปิดแล้วเมื่อเวลาปัจจุบัน >= F 21:00 UTC
+    (ตลาดหุ้นสหรัฐปิด 20:00 UTC ช่วง EDT / 21:00 UTC ช่วง EST — ใช้ 21:00
+    เป็นขอบปลอดภัยตลอดปี)
+
+    ตัดทิ้ง ไม่ใช่ทำให้รันล้ม: ข้อมูลสัปดาห์ก่อนหน้ายังถูกต้องและใช้งานได้"""
+    now = pd.Timestamp(datetime.now(timezone.utc).replace(tzinfo=None))
+    while len(df) and (df.index[-1] + pd.Timedelta(hours=21)) > now:
+        print(f"  ตัดแท่งที่ยังไม่ปิด: {df.index[-1].date()} "
+              f"(ปิดจริง {(df.index[-1] + pd.Timedelta(hours=21))} UTC)")
+        df = df.iloc[:-1]
+    if df.empty:
+        sys.exit("FATAL: ไม่เหลือสัปดาห์ที่ปิดแล้วเลย — ไม่เขียนอะไรทั้งสิ้น")
+    return df
 
 
 def validate(new: pd.DataFrame, tickers: list) -> dict:
@@ -506,6 +535,7 @@ def main() -> None:
 
     new = fetch_weekly(tickers)
     new = new.reindex(columns=tickers)          # preserve column order exactly
+    new = drop_incomplete_week(new)             # v1.8: กันกระดานผีจากแท่งครึ่งใบ
     rep = validate(new, tickers)
     print(f"validated: asof {rep['asof']}, {rep['rows']} rows, "
           f"coverage {rep['coverage']:.0%}")
@@ -562,12 +592,12 @@ def main() -> None:
 
     # ---- Cboe vol indices (independent failure; never blocks the price run) ----
     try:
-        vol = fetch_vol_indices()
+        vol, daily_vol = fetch_vol_indices()
         vol.to_csv(VOLSNAP, index=False)          # derived snapshot: safe to replace
         ok = vol["close"].notna().sum()
         print(f"WROTE {VOLSNAP} ({ok}/{len(vol)} indices)")
-        fri, act, n0, n1 = upsert_vol_history(vol)   # history: upsert, never clobber
-        print(f"WROTE {VOLIDX} (week_ending {fri} {act}, {n0} -> {n1} rows)")
+        n1, n0, last = rebuild_vol_history(daily_vol)  # history: rebuild เต็ม idempotent
+        print(f"WROTE {VOLIDX} (rebuild {n0} -> {n1} สัปดาห์, ล่าสุด {last})")
         print("\nVOL INDICES:")
         for _, v in vol.iterrows():
             if pd.notna(v["close"]):

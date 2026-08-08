@@ -46,7 +46,7 @@ v1.8: drop_incomplete_week() — ตัดแท่งสัปดาห์ท�
       validate() จับไม่ได้เพราะ coverage ยังขึ้น 100% ทุก ticker มีค่าครบ
       แค่เป็นค่ากลางสัปดาห์ ยืนยันด้วยการวัดจริง 2026-08-07: INDA พลิก
       -0.05 -> +0.04 เพราะรันตอนตลาด US ยังไม่เปิด
-v1.9: vol_indices.csv rebuild เต็มไฟล์จากรายวัน 2y (idempotent) แทน upsert
+v2.1: SKEW + equity put/call ดึงจาก cdn.cboe.com โดยตรง (Cboe เป็นผู้คำนวณ\n      Yahoo แค่ mirror และขาดค่าวันศุกร์เป็นครั้งคราว) · drop_lagging_columns()\n      เขียน null แทนค่าวันก่อนหน้าเมื่อซีรีส์มาช้า · board.json รวมทุกอย่าง\n      ไว้ไฟล์เดียวสำหรับเสิร์ฟผ่าน GitHub Pages\nv1.9: vol_indices.csv rebuild เต็มไฟล์จากรายวัน 2y (idempotent) แทน upsert
       v1.6 เขียน snapshot long ทับประวัติ wide สำเร็จจริง 2026-08-07T01:50Z
       (f61ae7e) ประวัติตั้งแต่ 2025-05-16 หายเกลี้ยง rebuild กู้คืนได้เองโดย
       ไม่ต้องขุด git · เพิ่ม VVIX กลับเข้า VOL_INDICES (เคยอยู่ในไฟล์เดิมแต่
@@ -98,6 +98,19 @@ STATUS = DATA / "_status.json"
 VOLIDX = DATA / "vol_indices.csv"    # WIDE history, week_ending x index — UPSERT ONLY
 VOLSNAP = DATA / "vol_snapshot.csv"  # long snapshot w/ 52w percentile — safe to overwrite
 HULL3D = DATA / "hull3d.csv"
+BOARD = DATA / "board.json"          # v2.1: ทุกอย่างในไฟล์เดียว เสิร์ฟผ่าน GitHub Pages
+
+# ---- Cboe โดยตรง (ไม่ผ่าน Yahoo) -------------------------------------------
+# Cboe เป็นผู้คำนวณดัชนีเหล่านี้เอง Yahoo แค่ mirror มา และ mirror มีช่องโหว่:
+# ถ้า Yahoo ขาดค่าวันศุกร์ resample("W-FRI").last() จะหยิบค่าวันพฤหัสมาแล้ว
+# ติดป้ายว่าเป็นศุกร์ โดยไม่มีสัญญาณเตือน — SKEW เพี้ยนด้วยกลไกนี้
+#
+# equitypc.csv คือชุด EQUITY เท่านั้น (ตัด ETP ออกตั้งแต่ 2012-06-11) ตรงกับที่
+# Protocol B.1 ต้องการ และปิดกับดัก Total-P/C ที่ทำให้ค่า >= 0.85 ถูก REJECT
+# มาหลายรอบ — ปัญหาเดิมคือดึงจาก YCharts ด้วยมือแล้วหยิบผิดชุด/ข้อมูลมาช้า
+CBOE_SKEW_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
+CBOE_PCR_URL = "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv"
+PCR_REJECT_HI = 0.85     # Protocol B.1: ค่าสูงกว่านี้ = น่าจะหยิบชุด Total มาผิด
 
 HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
 HMA_PERIOD = 55
@@ -141,7 +154,8 @@ VOL_INDICES = {
     "VXEFA": "^VXEFA",    # EAFE 30d IV         -> japan/europe (REGIONAL proxy)
     "VXHYG": "^VXHYG",    # HY credit 30d IV    -> bonds
     "VVIX": "^VVIX",      # vol-of-vol          -> เคยอยู่ในไฟล์เดิม ต้องดึงเองไม่งั้นหาย
-    "SKEW": "^SKEW",      # tail-risk pricing   -> context only, not an IV
+    # SKEW ย้ายไปดึงจาก Cboe โดยตรง (fetch_cboe_series) — Yahoo ขาดค่าวันศุกร์
+    # เป็นครั้งคราวแล้วทำให้ค่าวันพฤหัสถูกติดป้ายเป็นศุกร์
 }
 VOL_HISTORY = "2y"      # v1.9: rebuild ประวัติ weekly ทั้งชุดจากรายวัน
                         # ไฟล์เดิมเริ่ม 2025-05-16 — 2y ครอบคลุมเกินนั้น
@@ -420,7 +434,7 @@ def rebuild_vol_history(daily: dict) -> tuple:
     if not daily:
         raise RuntimeError("ไม่มี index ไหนคืนข้อมูลรายวันเลย — ไม่แตะไฟล์")
 
-    cols = {}
+    cols, obs_last = {}, {}
     for name, s in daily.items():
         idx = pd.to_datetime(s.index)
         try:
@@ -428,12 +442,14 @@ def rebuild_vol_history(daily: dict) -> tuple:
         except TypeError:
             idx = idx.tz_convert(None)
         ser = pd.Series(s.values, index=idx).sort_index()
+        obs_last[name] = ser.index[-1].normalize()
         cols[name] = ser.resample("W-FRI").last().dropna().round(2)
 
     new = pd.DataFrame(cols)
     new.index = pd.to_datetime(new.index).normalize()
     new.index.name = "week_ending"
     new = drop_incomplete_week(new)          # แท่งสัปดาห์ปัจจุบันยังไม่ปิด
+    new = drop_lagging_columns(new, obs_last)   # ซีรีส์ที่ข้อมูลมาช้า -> null ไม่ใช่ค่าเก่า
 
     before = 0
     if VOLIDX.exists():
@@ -536,6 +552,93 @@ def append_hull3d_history(h3: pd.DataFrame, weekly_colors: dict) -> tuple:
     agree = cur[cur["agree"].notna()]["agree"]
     rate = f"{agree.mean()*100:.0f}%" if len(agree) else "n/a"
     return before, len(cur), weeks, rate
+
+
+def fetch_cboe_series(url: str, date_col: str, val_col: str, label: str) -> pd.Series:
+    """ดึง CSV จาก cdn.cboe.com เป็น Series รายวัน (index=วันที่, value=float)
+
+    Cboe วางหัวตารางไว้ไม่ตรงบรรทัดแรกเสมอ — ไล่หาบรรทัดที่มีชื่อคอลัมน์จริง
+    แล้วอ่านจากตรงนั้น ล้มเหลว = คืน Series ว่าง ไม่ใช่ค่าเดา"""
+    import io
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+    except Exception as e:
+        print(f"  cboe {label}: ดึงไม่ได้ — {str(e)[:80]}", file=sys.stderr)
+        return pd.Series(dtype=float)
+
+    lines = raw.splitlines()
+    hdr = next((i for i, l in enumerate(lines[:40])
+                if date_col.lower() in l.lower() and val_col.lower() in l.lower()), None)
+    if hdr is None:
+        print(f"  cboe {label}: หาหัวตาราง '{date_col}'/'{val_col}' ไม่เจอ", file=sys.stderr)
+        return pd.Series(dtype=float)
+    try:
+        df = pd.read_csv(io.StringIO("\n".join(lines[hdr:])))
+        df.columns = [str(c).strip() for c in df.columns]
+        dcol = next(c for c in df.columns if date_col.lower() in c.lower())
+        vcol = next(c for c in df.columns if c.strip().lower() == val_col.lower())
+        s = pd.Series(pd.to_numeric(df[vcol], errors="coerce").values,
+                      index=pd.to_datetime(df[dcol], errors="coerce")).dropna()
+        s = s[~s.index.isna()].sort_index()
+        print(f"  cboe {label}: {len(s)} วัน ล่าสุด {s.index[-1].date()} = {s.iloc[-1]}")
+        return s
+    except Exception as e:
+        print(f"  cboe {label}: parse ล้มเหลว — {str(e)[:80]}", file=sys.stderr)
+        return pd.Series(dtype=float)
+
+
+def drop_lagging_columns(wide: pd.DataFrame, obs_last: dict) -> pd.DataFrame:
+    """ถ้าซีรีส์ไหนมีวันสังเกตล่าสุดตามหลังกลุ่ม = ข้อมูลมาช้า -> เขียน null
+    ในสัปดาห์ล่าสุด แทนที่จะปล่อยให้ค่าวันก่อนหน้าถูกติดป้ายเป็นวันศุกร์
+
+    ถ้าทุกซีรีส์ตามหลังเท่ากัน = วันหยุดตลาด -> เก็บไว้ตามปกติ
+    กฎนี้แยกวันหยุดออกจากข้อมูลมาช้าได้เองโดยไม่ต้องมีปฏิทินวันหยุด"""
+    if wide.empty or not obs_last:
+        return wide
+    newest = max(obs_last.values())
+    last_wk = wide.index[-1]
+    for col, d in obs_last.items():
+        if col in wide.columns and d < newest:
+            print(f"  {col}: ข้อมูลล่าสุด {d.date()} ตามหลังกลุ่ม ({newest.date()}) "
+                  f"-> null ที่ {last_wk.date()}", file=sys.stderr)
+            wide.at[last_wk, col] = pd.NA
+    return wide
+
+
+def write_board(rep: dict, hull_rows: list, h3: pd.DataFrame,
+                vol_snap: pd.DataFrame, pcr: dict) -> None:
+    """รวมทุกอย่างที่ต้องใช้ไว้ในไฟล์เดียว เสิร์ฟผ่าน GitHub Pages
+
+    เหตุผล: หน้า blob ของ CSV บน github.com เรนเดอร์ตารางด้วย JS จึงอ่านจาก
+    ภายนอกไม่ได้ ส่วน raw.githubusercontent ติด robots และ CDN cache ค้างนาน
+    ไฟล์ JSON เดียวบน github.io แก้ทั้งสองปัญหา และไม่ต้อง copy ทีละไฟล์"""
+    board = {
+        "asof": rep["asof"],
+        "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "coverage": rep["coverage"],
+        "rows": rep["rows"],
+        "hull_weekly": [
+            {k: r[k] for k in ("ticker", "close", "margin_pct", "color", "near_flip")}
+            for r in hull_rows
+        ],
+        "hull3d": [
+            {"ticker": r["ticker"], "margin_pct": r["margin_pct"], "color": r["color"],
+             "near_flip": r["near_flip"], "weekly_color": r.get("weekly_color"),
+             "agree": r.get("agree"), "est_flag": r["est_flag"]}
+            for _, r in h3.iterrows()
+        ] if h3 is not None and not h3.empty else [],
+        "vol": [
+            {"index": r["index"], "close": (None if pd.isna(r["close"]) else r["close"]),
+             "pct_52w": (None if pd.isna(r["pct_52w"]) else r["pct_52w"]),
+             "asof": (None if pd.isna(r["asof"]) else r["asof"])}
+            for _, r in vol_snap.iterrows()
+        ] if vol_snap is not None and not vol_snap.empty else [],
+        "put_call_equity": pcr,
+    }
+    BOARD.write_text(json.dumps(board, indent=1, default=str))
+    print(f"WROTE {BOARD}")
 
 
 def validate(new: pd.DataFrame, tickers: list) -> dict:
@@ -654,6 +757,17 @@ def main() -> None:
     # ---- Cboe vol indices (independent failure; never blocks the price run) ----
     try:
         vol, daily_vol = fetch_vol_indices()
+        # SKEW จาก Cboe โดยตรง — ผู้คำนวณตัวจริง ไม่ใช่ mirror ที่มีช่องโหว่
+        skew = fetch_cboe_series(CBOE_SKEW_URL, "DATE", "SKEW", "SKEW")
+        if not skew.empty:
+            daily_vol["SKEW"] = skew
+            w52 = skew.iloc[-252:]
+            vol = pd.concat([vol, pd.DataFrame([dict(
+                asof=skew.index[-1].date().isoformat(), index="SKEW", symbol="cboe:SKEW",
+                close=round(float(skew.iloc[-1]), 2),
+                pct_52w=round(float((w52 <= skew.iloc[-1]).mean()*100), 1),
+                lo_52w=round(float(w52.min()), 2), hi_52w=round(float(w52.max()), 2))])],
+                ignore_index=True)
         vol.to_csv(VOLSNAP, index=False)          # derived snapshot: safe to replace
         ok = vol["close"].notna().sum()
         print(f"WROTE {VOLSNAP} ({ok}/{len(vol)} indices)")
@@ -675,6 +789,31 @@ def main() -> None:
     # Full board in the run's own log. The committed CSV can sit behind a CDN
     # cache for several minutes after a push, so the log must be sufficient on
     # its own to reconstruct every signal without a second channel.
+    # ---- Cboe equity put/call (non-fatal) ----
+    pcr = {"value": None, "asof": None, "series": "cboe_equity", "status": "not_fetched"}
+    try:
+        s_pcr = fetch_cboe_series(CBOE_PCR_URL, "DATE", "P/C Ratio", "EQUITY P/C")
+        if not s_pcr.empty:
+            v = round(float(s_pcr.iloc[-1]), 4)
+            pcr = {"value": v, "asof": s_pcr.index[-1].date().isoformat(),
+                   "series": "cboe_equity", "status": "ok",
+                   "w5_avg": round(float(s_pcr.iloc[-5:].mean()), 4)}
+            if v >= PCR_REJECT_HI:          # Protocol B.1: กับดักชุด Total
+                pcr["status"] = "REJECT_check_series"
+                print(f"::warning::equity P/C {v} >= {PCR_REJECT_HI} — "
+                      f"ตรวจว่าหยิบชุด Total มาผิดหรือไม่", file=sys.stderr)
+            print(f"EQUITY P/C = {v} (asof {pcr['asof']}, 5d avg {pcr['w5_avg']})")
+        else:
+            pcr["status"] = "fetch_failed"
+    except Exception as e:
+        pcr["status"] = f"error: {str(e)[:60]}"
+        print(f"put/call block failed (non-fatal): {str(e)[:100]}", file=sys.stderr)
+
+    try:
+        write_board(rep, rows, locals().get("h3"), locals().get("vol"), pcr)
+    except Exception as e:
+        print(f"board.json failed (non-fatal): {str(e)[:100]}", file=sys.stderr)
+
     print(f"\nHULL BOARD (asof {rep['asof']}):")
     for r in rows:
         if r["color"]:

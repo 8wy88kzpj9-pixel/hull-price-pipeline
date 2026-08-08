@@ -111,6 +111,13 @@ BOARD = DATA / "board.json"          # v2.1: ทุกอย่างในไ�
 CBOE_SKEW_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
 CBOE_PCR_URL = "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv"
 PCR_REJECT_HI = 0.85     # Protocol B.1: ค่าสูงกว่านี้ = น่าจะหยิบชุด Total มาผิด
+MAX_SOURCE_AGE_DAYS = 10 # ค่าที่เก่ากว่านี้ = null ไม่ใช่ค่าที่ใช้ได้
+#
+# ทำไมต้องมี: 2026-08-08 ระบบเขียน equity P/C = 0.65 asof 2019-10-04 ลง board
+# ด้วยสถานะ "ok" เพราะ URL ที่ตั้งไว้เป็นไฟล์ archive ที่หยุดตั้งแต่ปี 2019
+# ค่านั้นผ่านทุกด่าน: parse ได้ อยู่ในช่วงสมเหตุสมผล ต่ำกว่า PCR_REJECT_HI
+# ด่านตรวจ "ค่า" จับ "ตัวตน" ไม่ได้ — ต้องตรวจวันที่ด้วยเสมอ
+# (รูปแบบเดียวกับเหตุการณ์ OAS ปีผิดที่ผ่าน hard-gate เพราะ HY > IG ยังเป็นจริง)
 
 HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
 HMA_PERIOD = 55
@@ -163,6 +170,16 @@ VOL_HISTORY = "2y"      # v1.9: rebuild ประวัติ weekly ทั้�
 # Column name in weekly_closes.csv -> yfinance symbol. Column names are the
 # system of record (tracker/TICKER_MAP read them); only the fetch layer needs
 # the vendor spelling. Add here when a fetch returns empty for one ticker.
+# ticker ที่เพิ่มเข้า universe โดยไม่ต้องแก้หัวตาราง weekly_closes.csv ด้วยมือ
+# universe ปกติอ่านจากหัวตารางของไฟล์เดิม การเพิ่มคอลัมน์บนมือถือทำไม่ไหว
+# idempotent rebuild จะ backfill ประวัติ 3 ปีของ ticker ใหม่ให้เองในรอบแรก
+#
+# URTH = MSCI World (DM รวม US ~60%)  -> EPFR "Total DM"
+# EFA  = MSCI EAFE (DM ไม่รวม US/แคนาดา) -> EPFR "International"
+# ผ่าน liquidity gate: EFA AUM 71.4bn ADV $2.45bn · URTH AUM 7.75bn ADV $101mn
+# (เกณฑ์เดียวกับที่ KTEC ไม่ผ่าน — ที่นั่นคือ effective volume ศูนย์)
+EXTRA_TICKERS = ["URTH", "EFA"]
+
 SYMBOL_MAP = {
     "BTCUSD": "BTC-USD",
     "GSPC": "^GSPC",
@@ -551,6 +568,12 @@ def append_hull3d_history(h3: pd.DataFrame, weekly_colors: dict) -> tuple:
     weeks = cur["asof"].nunique()
     agree = cur[cur["agree"].notna()]["agree"]
     rate = f"{agree.mean()*100:.0f}%" if len(agree) else "n/a"
+    # เขียน weekly_color/agree กลับเข้า h3 ตัวจริงด้วย ไม่ใช่แค่ในสำเนา —
+    # write_board() อ่านจาก h3 ถ้าไม่เขียนกลับ board.json จะได้ null ทั้งคอลัมน์
+    h3["weekly_color"] = h3["ticker"].map(weekly_colors)
+    h3["agree"] = [None if (pd.isna(r["color"]) or not r["weekly_color"])
+                   else bool(r["color"] == r["weekly_color"])
+                   for _, r in h3.iterrows()]
     return before, len(cur), weeks, rate
 
 
@@ -690,7 +713,10 @@ def main() -> None:
 
     tickers = [c for c in pd.read_csv(CLOSES, nrows=1).columns
                if c.lower() != "week_ending"]
-    print(f"universe: {len(tickers)} tickers (from existing header)")
+    added = [t for t in EXTRA_TICKERS if t not in tickers]
+    tickers += added
+    print(f"universe: {len(tickers)} tickers (header + EXTRA_TICKERS)"
+          + (f" | เพิ่มใหม่รอบนี้: {added}" if added else ""))
 
     new = fetch_weekly(tickers)
     new = new.reindex(columns=tickers)          # preserve column order exactly
@@ -795,10 +821,17 @@ def main() -> None:
         s_pcr = fetch_cboe_series(CBOE_PCR_URL, "DATE", "P/C Ratio", "EQUITY P/C")
         if not s_pcr.empty:
             v = round(float(s_pcr.iloc[-1]), 4)
-            pcr = {"value": v, "asof": s_pcr.index[-1].date().isoformat(),
+            d_obs = s_pcr.index[-1].date()
+            age = (datetime.now(timezone.utc).date() - d_obs).days
+            pcr = {"value": v, "asof": d_obs.isoformat(), "age_days": age,
                    "series": "cboe_equity", "status": "ok",
                    "w5_avg": round(float(s_pcr.iloc[-5:].mean()), 4)}
-            if v >= PCR_REJECT_HI:          # Protocol B.1: กับดักชุด Total
+            if age > MAX_SOURCE_AGE_DAYS:   # ตรวจตัวตน ไม่ใช่แค่ค่า
+                pcr.update(value=None, w5_avg=None,
+                           status=f"STALE_{age}d_source_is_archive")
+                print(f"::error::equity P/C asof {d_obs} เก่า {age} วัน — "
+                      f"URL น่าจะชี้ไปที่ไฟล์ archive ไม่ใช่ไฟล์ปัจจุบัน", file=sys.stderr)
+            elif v >= PCR_REJECT_HI:        # Protocol B.1: กับดักชุด Total
                 pcr["status"] = "REJECT_check_series"
                 print(f"::warning::equity P/C {v} >= {PCR_REJECT_HI} — "
                       f"ตรวจว่าหยิบชุด Total มาผิดหรือไม่", file=sys.stderr)

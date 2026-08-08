@@ -10,7 +10,7 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-08-07,GLTR,167,196.02,183.3611,184.845,-0.8,red,False,parallel-validation,red,True
 2026-08-07,GSPC,167,7757.6401,7666.9924,7644.983,0.29,green,False,parallel-validation,green,True
 2026-08-07,HYG,167,79.61,79.6341,79.659,-0.03,red,True,parallel-validation,red,True
-2026-08-07,INDA,167,50.365,48.5005,48.3452,0.32,green,False,parallel-validation,green,True
+2026-08-07,INDA,167,50.37,48.5006,48.3452,0.32,green,False,parallel-validation,green,True
 2026-08-07,IWD,167,257.56,250.6285,249.1853,0.58,green,False,parallel-validation,green,True
 2026-08-07,IWF,167,124.6,124.7285,124.6976,0.02,green,True,parallel-validation,green,True
 2026-08-07,IWM,167,301.56,302.6103,301.6226,0.33,green,False,parallel-validation,green,True

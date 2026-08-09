@@ -178,7 +178,15 @@ VOL_HISTORY = "2y"      # v1.9: rebuild ประวัติ weekly ทั้�
 # EFA  = MSCI EAFE (DM ไม่รวม US/แคนาดา) -> EPFR "International"
 # ผ่าน liquidity gate: EFA AUM 71.4bn ADV $2.45bn · URTH AUM 7.75bn ADV $101mn
 # (เกณฑ์เดียวกับที่ KTEC ไม่ผ่าน — ที่นั่นคือ effective volume ศูนย์)
-EXTRA_TICKERS = ["URTH", "EFA"]
+# URTH = MSCI World -> "Total DM" · EFA = MSCI EAFE -> "International"
+# ตัวที่เหลือรองรับธีมที่ Hartnett พูดถึงเป็นประจำแต่เดิมไม่มี ticker ในระบบ:
+#   XLP staples · XLI industrials · XBI biotech · UUP US dollar
+#   TLT duration · VYM dividends · IAI brokers (เขาอ้าง XBD ซึ่งไม่มี ETF)
+# UUP ยืนยัน 2026-08-09: AUM 573.9mn ADV 2.00mn หุ้น = $54.8mn/วัน
+# XLP/XLI เป็น Select Sector SPDR ตระกูลเดียวกับ XLF/XLV/XLE ที่อยู่ในระบบแล้ว
+# ที่เหลือเป็น ETF ระดับ top-50 ของสหรัฐ — ถ้าตัวไหน Yahoo ไม่เสิร์ฟ จะโผล่ใน
+# missing_tickers และ validate-then-write จะรักษาไฟล์เดิมไว้ ไม่เสียหาย
+EXTRA_TICKERS = ["URTH", "EFA", "XLP", "XLI", "XBI", "UUP", "TLT", "VYM", "IAI"]
 
 SYMBOL_MAP = {
     "BTCUSD": "BTC-USD",

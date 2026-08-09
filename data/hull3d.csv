@@ -3,6 +3,7 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-08-06,BTCUSD,243,64262.1133,60740.1634,61051.354,-0.51,red,False,parallel-validation,red,True
 2026-08-07,ACWI,167,161.44,159.939,159.5934,0.22,green,False,parallel-validation,green,True
 2026-08-07,EEM,167,65.64,68.6202,68.7723,-0.22,red,False,parallel-validation,green,False
+2026-08-07,EFA,167,108.55,105.4394,105.1674,0.26,green,False,parallel-validation,green,True
 2026-08-07,EWH,167,22.71,22.0361,22.0333,0.01,green,True,parallel-validation,red,False
 2026-08-07,EWJ,167,96.9,94.7699,94.5767,0.2,green,False,parallel-validation,green,True
 2026-08-07,EWZ,167,35.34,35.2314,35.3528,-0.34,red,False,parallel-validation,red,True
@@ -19,6 +20,7 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-08-07,SOXX,167,543.27,624.8534,626.2075,-0.22,red,False,parallel-validation,green,False
 2026-08-07,SPY,167,773.26,764.5325,762.3544,0.29,green,False,parallel-validation,green,True
 2026-08-07,THD,167,73.63,73.8007,73.7767,0.03,green,True,parallel-validation,green,True
+2026-08-07,URTH,167,210.47,207.0943,206.5214,0.28,green,False,parallel-validation,green,True
 2026-08-07,VGK,167,92.6,89.733,89.444,0.32,green,False,parallel-validation,green,True
 2026-08-07,XLB,167,52.86,51.4885,51.4635,0.05,green,True,parallel-validation,red,False
 2026-08-07,XLC,167,111.25,109.5762,109.8165,-0.22,red,False,parallel-validation,red,True
@@ -29,3 +31,4 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-08-07,XLU,167,43.61,44.9222,45.0018,-0.18,red,False,parallel-validation,red,True
 2026-08-07,XLV,167,165.68,156.9976,155.7378,0.81,green,False,parallel-validation,green,True
 2026-08-07,XLY,167,119.86,116.4194,116.407,0.01,green,True,parallel-validation,red,False
+2026-08-08,BTCUSD,243,64904.6875,60827.814,61018.1487,-0.31,red,False,parallel-validation,red,True

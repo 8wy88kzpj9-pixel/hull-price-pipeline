@@ -3,7 +3,7 @@
   "coverage": 1.0,
   "rows": 157,
   "missing_tickers": [],
-  "run_utc": "2026-08-08T04:07:12+00:00",
+  "run_utc": "2026-08-09T07:07:35+00:00",
   "hull_nulls": [],
   "near_flips": [
     "EEM +0.11",
@@ -16,6 +16,7 @@
     "XLU -0.15",
     "XLE +0.02",
     "XLB -0.07",
-    "XLY -0.05"
+    "XLY -0.05",
+    "EFA +0.21"
   ]
 }

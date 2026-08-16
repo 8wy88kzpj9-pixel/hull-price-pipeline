@@ -1,6 +1,6 @@
 {
  "asof": "2026-08-14",
- "generated_utc": "2026-08-15T02:48:41+00:00",
+ "generated_utc": "2026-08-16T06:53:32+00:00",
  "coverage": 1.0,
  "rows": 157,
  "hull_weekly": [
@@ -56,7 +56,7 @@
   {
    "ticker": "THD",
    "close": 72.82,
-   "margin_pct": 0.17,
+   "margin_pct": 0.19,
    "color": "green",
    "near_flip": true
   },
@@ -104,7 +104,7 @@
   },
   {
    "ticker": "BTCUSD",
-   "close": 63050.7188,
+   "close": 63001.8906,
    "margin_pct": -0.18,
    "color": "red",
    "near_flip": true
@@ -147,7 +147,7 @@
   {
    "ticker": "XLC",
    "close": 112.95,
-   "margin_pct": -0.36,
+   "margin_pct": -0.33,
    "color": "red",
    "near_flip": false
   },
@@ -326,7 +326,7 @@
   },
   {
    "ticker": "INDA",
-   "margin_pct": 0.29,
+   "margin_pct": 0.28,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -407,9 +407,9 @@
   },
   {
    "ticker": "BTCUSD",
-   "margin_pct": -0.24,
+   "margin_pct": -0.17,
    "color": "red",
-   "near_flip": false,
+   "near_flip": true,
    "weekly_color": "red",
    "agree": true,
    "est_flag": "parallel-validation"
@@ -443,7 +443,7 @@
   },
   {
    "ticker": "IWF",
-   "margin_pct": 0.09,
+   "margin_pct": 0.02,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -461,7 +461,7 @@
   },
   {
    "ticker": "XLC",
-   "margin_pct": -0.1,
+   "margin_pct": -0.17,
    "color": "red",
    "near_flip": true,
    "weekly_color": "red",
@@ -497,7 +497,7 @@
   },
   {
    "ticker": "XLRE",
-   "margin_pct": 0.05,
+   "margin_pct": 0.09,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -542,11 +542,11 @@
   },
   {
    "ticker": "SETBK",
-   "margin_pct": NaN,
-   "color": NaN,
-   "near_flip": null,
+   "margin_pct": 0.47,
+   "color": "green",
+   "near_flip": false,
    "weekly_color": "green",
-   "agree": null,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
@@ -676,15 +676,15 @@
   },
   {
    "index": "VXEWZ",
-   "close": null,
-   "pct_52w": null,
-   "asof": null
+   "close": 29.32,
+   "pct_52w": 47.2,
+   "asof": "2026-07-17"
   },
   {
    "index": "VXEFA",
-   "close": 15.27,
-   "pct_52w": 28.2,
-   "asof": "2026-08-14"
+   "close": 16.58,
+   "pct_52w": 49.6,
+   "asof": "2026-07-17"
   },
   {
    "index": "VXHYG",
@@ -708,9 +708,9 @@
  "put_call_equity": {
   "value": null,
   "asof": "2019-10-04",
-  "age_days": 2507,
+  "age_days": 2508,
   "series": "cboe_equity",
-  "status": "STALE_2507d_source_is_archive",
+  "status": "STALE_2508d_source_is_archive",
   "w5_avg": null
  }
 }

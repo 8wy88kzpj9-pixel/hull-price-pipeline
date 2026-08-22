@@ -1,0 +1,121 @@
+{
+ "probed_utc": "2026-08-22T01:54:50+00:00",
+ "gate": {
+  "min_oi_atm": 100,
+  "max_spread_pct": 15.0
+ },
+ "rows": [
+  {
+   "ticker": "SPY",
+   "symbol": "SPY",
+   "iv30": 12.63,
+   "iv90": 14.78,
+   "dte30": 27,
+   "dte90": 90,
+   "oi_atm": 3422,
+   "spread_pct": 0.5,
+   "iv_gap": 1.21,
+   "slope": 2.15,
+   "pass": true,
+   "note": ""
+  },
+  {
+   "ticker": "ACWI",
+   "symbol": "ACWI",
+   "iv30": null,
+   "iv90": null,
+   "dte30": null,
+   "dte90": null,
+   "oi_atm": null,
+   "spread_pct": null,
+   "iv_gap": null,
+   "slope": null,
+   "pass": false,
+   "note": "ATM unreadable at 2026-09-18"
+  },
+  {
+   "ticker": "EEM",
+   "symbol": "EEM",
+   "iv30": 24.49,
+   "iv90": 29.03,
+   "dte30": 27,
+   "dte90": 90,
+   "oi_atm": 37759,
+   "spread_pct": 11.7,
+   "iv_gap": 0.93,
+   "slope": 4.54,
+   "pass": true,
+   "note": ""
+  },
+  {
+   "ticker": "MCHI",
+   "symbol": "MCHI",
+   "iv30": 26.66,
+   "iv90": 26.75,
+   "dte30": 27,
+   "dte90": 90,
+   "oi_atm": 11,
+   "spread_pct": 74.5,
+   "iv_gap": 2.25,
+   "slope": 0.09,
+   "pass": false,
+   "note": "OI 11 < 100; spread 74.5% > 15.0%; "
+  },
+  {
+   "ticker": "EWZ",
+   "symbol": "EWZ",
+   "iv30": 31.64,
+   "iv90": 39.19,
+   "dte30": 27,
+   "dte90": 90,
+   "oi_atm": 69051,
+   "spread_pct": 26.8,
+   "iv_gap": 9.57,
+   "slope": 7.55,
+   "pass": false,
+   "note": "spread 26.8% > 15.0%; "
+  },
+  {
+   "ticker": "INDA",
+   "symbol": "INDA",
+   "iv30": 16.6,
+   "iv90": 26.87,
+   "dte30": 27,
+   "dte90": 118,
+   "oi_atm": 3550,
+   "spread_pct": 31.6,
+   "iv_gap": 0.2,
+   "slope": 10.27,
+   "pass": false,
+   "note": "spread 31.6% > 15.0%; "
+  },
+  {
+   "ticker": "EWH",
+   "symbol": "EWH",
+   "iv30": 42.48,
+   "iv90": 41.72,
+   "dte30": 27,
+   "dte90": 118,
+   "oi_atm": 82,
+   "spread_pct": 137.8,
+   "iv_gap": 49.51,
+   "slope": -0.76,
+   "pass": false,
+   "note": "OI 82 < 100; spread 137.8% > 15.0%; "
+  },
+  {
+   "ticker": "THD",
+   "symbol": "THD",
+   "iv30": null,
+   "iv90": null,
+   "dte30": null,
+   "dte90": null,
+   "oi_atm": null,
+   "spread_pct": null,
+   "iv_gap": null,
+   "slope": null,
+   "pass": false,
+   "note": "ATM unreadable at 2026-12-18"
+  }
+ ]
+}

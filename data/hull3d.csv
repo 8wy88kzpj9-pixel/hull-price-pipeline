@@ -73,6 +73,7 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-08-14,XLY,167,118.2,116.4886,116.4236,0.06,green,True,parallel-validation,green,True
 2026-08-20,BTCUSD,243,73032.7578,60827.9106,60558.0623,0.45,green,False,parallel-validation,green,True
 2026-08-21,ACWI,167,160.81,160.5661,160.2189,0.22,green,False,parallel-validation,green,True
+2026-08-21,BTCUSD,243,78335.1875,60653.8187,60232.026,0.7,green,False,parallel-validation,green,True
 2026-08-21,EEM,167,67.12,67.6102,67.7298,-0.18,red,False,parallel-validation,green,False
 2026-08-21,EFA,167,108.24,105.9555,105.6324,0.31,green,False,parallel-validation,green,True
 2026-08-21,EWH,167,23.35,22.0127,21.9968,0.07,green,True,parallel-validation,red,False

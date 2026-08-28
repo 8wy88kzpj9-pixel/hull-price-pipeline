@@ -215,7 +215,7 @@ const { useState, useEffect, useCallback } = React;
 // Bump BOTH when shipping: TRACKER_VERSION is what a viewer sees on the
 // banner, SEED_VERSION is what the load gate compares. They answer
 // different questions and must not be collapsed into one string.
-const TRACKER_VERSION = "v2.9.0";
+const TRACKER_VERSION = "v2.10.0";
 const HULL_ASOF_DISPLAY = "2026-08-21";
 const SEED_VERSION = "2.9.0-wk19-0823"; // wk18 "Strife Begins at Forty" spliced 2026-08-16 (Flow Show 13 Aug edition, EPFR wk ended 8/12); IV_DATA re-spliced same day. SEED CONTENT CHANGED -> bump is REQUIRED: the strict-equality gate below orphans 2.6.0 saves so the new week is actually served. // wk14 "Fade Runner" spliced 2026-07-19 (Flow Show 7/17 edition) // v2.1: wk12 baked into seed (rev 1.2 seed-splice workflow). NOTE: strict-equality load gate below intentionally orphans v2.0 saves — fresh instances start empty anyway; patch replay is the recovery path.
 const STORAGE_KEY  = "hartnettPutV2_0"; // bumped: payload shape changed (added dataVersion)
@@ -998,6 +998,42 @@ const SEEDED_HISTORY = [
       sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
       sec_materials: "red", sec_consumer: "red",
     },
+    // Hull 3D (HMA55 on 3-day bars) spliced from board.json hull3d.
+    // Present ONLY for weeks where board.json was actually read. Earlier
+    // weeks carry no field at all and render "—" — never a back-filled guess.
+    hull3dSignals: {
+      global_stocks: "green",
+      japan_stocks: "green",
+      europe_stocks: "green",
+      em: "red",
+      em_total: "red",
+      china_stocks: "green",
+      em_china: "green",
+      em_brazil: "red",
+      em_india: "green",
+      hk: "green",
+      thailand: "green",
+      sox: "red",
+      ustech: "green",
+      sec_tech: "green",
+      gold: "red",
+      precious_metals: "red",
+      bonds: "red",
+      ig_bonds: "red",
+      crypto: "red",
+      us_largecap: "green",
+      us_smallcap: "green",
+      us_growth: "green",
+      us_value: "green",
+      sec_comsvs: "red",
+      sec_financials: "green",
+      sec_hcare: "green",
+      sec_utilities: "red",
+      sec_realestate: "green",
+      sec_energy: "green",
+      sec_materials: "green",
+      sec_consumer: "green",
+    },
     estFlags: {},
     // Display/context ONLY — computeSignal does not read volAux.
     volAux: {
@@ -1054,6 +1090,42 @@ const SEEDED_HISTORY = [
       sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
       sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
       sec_materials: "red", sec_consumer: "green",
+    },
+    // Hull 3D (HMA55 on 3-day bars) spliced from board.json hull3d.
+    // Present ONLY for weeks where board.json was actually read. Earlier
+    // weeks carry no field at all and render "—" — never a back-filled guess.
+    hull3dSignals: {
+      global_stocks: "green",
+      japan_stocks: "green",
+      europe_stocks: "green",
+      em: "red",
+      em_total: "red",
+      china_stocks: "green",
+      em_china: "green",
+      em_brazil: "red",
+      em_india: "green",
+      hk: "red",
+      thailand: "red",
+      sox: "red",
+      ustech: "green",
+      sec_tech: "green",
+      gold: "red",
+      precious_metals: "red",
+      bonds: "red",
+      ig_bonds: "red",
+      crypto: "red",
+      us_largecap: "green",
+      us_smallcap: "green",
+      us_growth: "green",
+      us_value: "green",
+      sec_comsvs: "red",
+      sec_financials: "green",
+      sec_hcare: "green",
+      sec_utilities: "red",
+      sec_realestate: "green",
+      sec_energy: "green",
+      sec_materials: "green",
+      sec_consumer: "green",
     },
     estFlags: {},
     // Display/context ONLY — computeSignal does not read volAux.
@@ -1116,6 +1188,42 @@ const SEEDED_HISTORY = [
       sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
       sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
       sec_materials: "green", sec_consumer: "green",
+    },
+    // Hull 3D (HMA55 on 3-day bars) spliced from board.json hull3d.
+    // Present ONLY for weeks where board.json was actually read. Earlier
+    // weeks carry no field at all and render "—" — never a back-filled guess.
+    hull3dSignals: {
+      global_stocks: "green",
+      japan_stocks: "green",
+      europe_stocks: "green",
+      em: "red",
+      em_total: "red",
+      china_stocks: "green",
+      em_china: "green",
+      em_brazil: "red",
+      em_india: "green",
+      hk: "green",
+      thailand: "green",
+      sox: "red",
+      ustech: "green",
+      sec_tech: "green",
+      gold: "green",
+      precious_metals: "green",
+      bonds: "red",
+      ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green",
+      us_smallcap: "green",
+      us_growth: "green",
+      us_value: "green",
+      sec_comsvs: "red",
+      sec_financials: "green",
+      sec_hcare: "green",
+      sec_utilities: "red",
+      sec_realestate: "green",
+      sec_energy: "green",
+      sec_materials: "green",
+      sec_consumer: "green",
     },
     estFlags: {},
     volAux: {
@@ -1332,6 +1440,23 @@ const TICKER_MAP = {
   sec_comsvs: "XLC", sec_financials: "XLF", sec_hcare: "XLV", sec_utilities: "XLU",
   sec_realestate: "XLRE", sec_energy: "XLE", sec_materials: "XLB", sec_consumer: "XLY",
 };
+
+// One row of the split Hull tile. Kept tiny and dumb: it renders exactly what
+// it is given and shows NO READ when handed null, so an unsourced 3D week can
+// never be mistaken for a neutral one.
+function HullLeg({ label, c }) {
+  const col = c ? HULL_COLOR[c] : "#B3A78F";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <span style={{ fontSize: 6.5, color: "#8A7E68", width: 13, letterSpacing: ".08em" }}>{label}</span>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: c ? HULL_COLOR[c] : "#D8CCB4",
+        boxShadow: c ? `0 0 5px ${HULL_COLOR[c]}` : "none", flex: "0 0 auto" }} />
+      <span style={{ fontSize: 8.5, color: col, fontWeight: 700, textTransform: "uppercase" }}>
+        {c === "green" ? "BULL" : c === "red" ? "BEAR" : c === "yellow" ? "FLAT" : "NO READ"}
+      </span>
+    </div>
+  );
+}
 
 const HULL_COLOR = { green: "#1FB94C", yellow: "#CA8A04", red: "#F43F5E" };
 
@@ -2118,6 +2243,14 @@ function HartnettTrackerPutV2() {
             const meta = SIG[sig] || SIG.NEUTRAL;
             const flow = week.flows[asset.id] ?? null;
             const hull = week.hullSignals[asset.id] ?? null;
+            // ⚠️ 3D is DISPLAY ONLY. computeSignal() does not read it and must not:
+            // the verdict rules were calibrated on the weekly read, and quietly
+            // feeding a faster series into them would change what every historical
+            // verdict meant without changing its name — the exact failure class
+            // that cost this system its vol history and its put/call series.
+            // If 3D is ever to drive verdicts, that is a rule change with a new
+            // name and a version bump, not a data swap.
+            const hull3d = (week.hull3dSignals && week.hull3dSignals[asset.id]) ?? null;
             const prevFlow = activeWeek > 0 ? (history[activeWeek - 1].flows[asset.id] ?? null) : null;
             const delta = (prevFlow !== null && flow !== null) ? flow - prevFlow : null;
             const iv = computeIV(asset.id, week);
@@ -2166,11 +2299,23 @@ function HartnettTrackerPutV2() {
                     )}
                   </div>
                   <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
-                    <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>HULL SUITE{TICKER_MAP[asset.id] ? ` \u00b7 ${TICKER_MAP[asset.id]}` : ""}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
-                      <div style={{ width: 9, height: 9, borderRadius: "50%", background: hull ? HULL_COLOR[hull] : "#D8CCB4", boxShadow: hull ? `0 0 5px ${HULL_COLOR[hull]}` : "none" }} />
-                      <span style={{ fontSize: 9, color: hull ? HULL_COLOR[hull] : "#B3A78F", fontWeight: 700, textTransform: "uppercase" }}>{hull === "green" ? "BULL" : hull === "red" ? "BEAR" : hull === "yellow" ? "FLAT" : "NO READ"}</span>
-                    </div>
+                    <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 3 }}>HULL SUITE{TICKER_MAP[asset.id] ? ` \u00b7 ${TICKER_MAP[asset.id]}` : ""}</div>
+                    {/* 3D sits ABOVE weekly because it leads: in this system the
+                        3-day read is the faster layer and the weekly is the slower
+                        confirmation. Reading order should match that. */}
+                    <HullLeg label="3D" c={hull3d} />
+                    <div style={{ height: 1, background: "#EFE6D4", margin: "4px 0" }} />
+                    <HullLeg label="W" c={hull} />
+                    {hull && hull3d && hull !== hull3d && (
+                      <div style={{ fontSize: 6.5, color: "#CA8A04", marginTop: 3, lineHeight: 1.3 }}>
+                        ⚠ 3D ≠ W — faster layer has turned first
+                      </div>
+                    )}
+                    {!hull3d && (
+                      <div style={{ fontSize: 6.5, color: "#B3A78F", marginTop: 3, lineHeight: 1.3 }}>
+                        3D not sourced for this week
+                      </div>
+                    )}
                   </div>
                   <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
                     <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>IV (52WK%ILE)</div>

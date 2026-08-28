@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hartnett Tracker</title>
+<!--
+  STANDALONE BUILD — served from GitHub Pages, not from a Claude artifact.
+
+  WHY THIS FILE EXISTS
+  A published Claude artifact serves the card it was published FROM. Every time
+  the tracker was rewritten it became a new card, so the shared link kept
+  serving v2.7.0 while the chat showed the current build. Three rounds of
+  re-publishing did not fix it because the link was bound to the old card.
+  Here the URL is fixed and the content is whatever is committed to the repo —
+  the same property that made board.json trustworthy once we stopped reading it
+  through a CDN cache. Update = commit. There is no publish step to go stale.
+
+  DEPLOY
+    1. commit this file as  docs/tracker.html   (or  tracker.html  at the repo
+       root if Pages is serving from the root — match wherever data/board.json
+       is being served from today)
+    2. open  https://8wy88kzpj9-pixel.github.io/hull-price-pipeline/tracker.html
+    3. send that URL once. It never changes again.
+
+  NOTE ON BABEL
+  JSX is transpiled in the browser by @babel/standalone. That costs roughly a
+  second on first paint for a file this size and is the price of keeping ONE
+  source of truth — the same .jsx that is compile-gated here also runs there,
+  with no build step to drift out of sync. If first paint ever gets annoying,
+  the fix is a real build step, not a hand-maintained second copy.
+-->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html,body{margin:0;padding:0;background:#FBFAF7;-webkit-text-size-adjust:100%}
+  #boot{padding:24px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:#6E6657}
+  #err{display:none;padding:16px;margin:16px;border:1px solid #B3261E;border-radius:6px;
+       background:#FDECEA;color:#B3261E;font:12px ui-monospace,Menlo,monospace;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div id="boot">loading tracker&hellip;</div>
+<div id="err"></div>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react" data-type="module">
+const { useState, useEffect, useCallback } = React;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── v2.8.0 (2026-08-16): wk18 "Strife Begins at Forty" SPLICED.
+//   Edition dated 13 Aug 2026 (quilt footer), EPFR week ended 8/12 (Table 1
+//   footnote) -> row labeled Fri 2026-08-14. Hull VERBATIM from board.json
+//   asof 2026-08-14 (generated 2026-08-16T06:53:32Z, coverage 1.0, 39 tickers).
+//   ── CORRECTION 2026-08-16 (user-flagged, applied before this file shipped) ──
+//   An earlier draft of this changelog claimed (a) "the tactical stance is
+//   gone" and (b) "USD reverses sides / resolved in favour of short USD".
+//   BOTH WERE OVER-READS and are retracted here.
+//   ABB / ABC / ABD / AI are DESCRIPTIVE labels for how money has been
+//   allocated in the 2020s — his exact words are "asset allocation rules of
+//   the road in 2020s REMAIN...". ABD describes investors buying anything but
+//   the dollar; it is NOT an instruction to be short USD. He then names the
+//   trade he sees within each regime ("On ABD: we say trade is long gold").
+//   Likewise "door wide open for bulls to rip risk higher" is a description of
+//   the setup, and he immediately lists the constraints — the third being
+//   "fact that all positioned for upside", which is a bearish caveat.
+//   WHAT IS ACTUALLY TRUE: wk18 simply does not restate the tactical retreat
+//   call or the long-USD call. Absence is not withdrawal. Per the carry rule
+//   both are CARRIED from wk17 with a flag. B&B and FMS Cash both still read
+//   Sell, so nothing mechanical changed sides either.
+//   ★ Four-bucket structure is how this edition is organised: ABB -> long
+//   REITs/XBI/KRE/small cap · ABC -> long Hong Kong property (he calls the END
+//   of Anywhere-But-China, i.e. fading that regime) · ABD -> long gold ·
+//   AI -> SHORT AI bonds, long "hubris"(AI) + long "humiliation" (distressed
+//   cyclicals; he names consumer and China as the next few quarters).
+//   ★ B&B FALLS 9.7 -> 9.3, first decline since the 5-year high. Still >8.0 so
+//   the SELL signal stands. Drivers verbatim: weaker HY bond flows, outflows
+//   from tech & healthcare. "Old" B&B unchanged at 7.8.
+//   ★ HULL: exactly ONE weekly flip vs wk17 — sec_consumer(XLY) red -> GREEN
+//   at +0.04, razor-thin. 3D flipped EWH and THD green -> red (not seeded;
+//   hullSignals carries WEEKLY color only, per schema).
+//   ★ FLOW: China -$14.5bn, biggest outflow since May'26, Wk %AUM -2.1 — and
+//   Hartnett simultaneously calls the END of Anywhere-But-China. Flow and
+//   opinion are now pointing OPPOSITE ways on China. Gold +$6.3bn biggest
+//   since Jan'26 and gold YTD flips POSITIVE (+1.0% vs -2.3% at wk17).
+//   ★ emOutflow4wk STILL null — Rules & Tools absent for the FOURTH straight
+//   edition. EM Flow Rule carried from wk15 (2.2% SELL). NOT re-derived.
+//   ★ cashLevel 3.6% CARRIED — August FMS releases the 18th, two days out.
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── v2.7.0 (2026-08-10): wk17 "Poor man's LTCM, rich man's YCC" SPLICED.
+//   Edition dated 6 Aug 2026, EPFR week ended 8/5 -> row labeled Fri 2026-08-07
+//   per the Friday-close convention. Hull VERBATIM from board.json asof
+//   2026-08-07 (generated 2026-08-09T07:08Z, coverage 1.0, rows 157).
+//   ★ B&B 9.7 from 9.4 — HIGHEST SINCE 2021. First RISE since the 5/26 sell
+//   signal; wk16's 9.4 was the only decline. Drivers verbatim: strong HY
+//   inflows, tighter global HY and AT1 spreads, stronger global stock index
+//   breadth. "Old" B&B 7.8 (from 7.4).
+//   ★ SELL STACK still x3 (B&B + FMS Cash 3.6 + EM Flow 2.2) but TWO OF THREE
+//   ARE NOW CARRIED: Rules & Tools table absent for the THIRD straight edition
+//   (wk15 is the last print). emOutflow4wk stays null — NOT re-derived.
+//   ★ HULL: exactly ONE flip vs wk16 — em_india(INDA) red -> GREEN at +0.05,
+//   a razor-thin cross well inside hysteresis. CHART-VERIFY before use.
+//   ★ FLOW: China Wk %AUM turns NEGATIVE -0.4 (first since the 4-week record
+//   run); EM +8.6bn but annualizing -$55bn YTD, worst since '15; tech -$0.7bn
+//   1st outflow in 6 weeks; semi ETFs -$2.4bn 1st in 6 weeks; gold +$0.9bn =
+//   5th straight week of precious-metal inflows while GLD Hull stays red.
+//   ★ Wk %AUM column moved again after two identical prints (23/31 Jul) —
+//   confirms that repeat was a BofA-side artifact, not our carry-forward.
+// ═══════════════════════════════════════════════════════════════════════════
+// v2.4.6 = v2.4.5 + wk15 "Bonds bringing the heat" (edition dated 23 Jul 2026,
+//   EPFR week ended 7/22; row labeled Fri 2026-07-24 per weekly convention).
+//   ★ SELL STACK RECOMPOSED: Global Flow Trading Rule 0.7% -> NEUTRAL (off from
+//   wk13 SELL); BofA EM FLOW TRADING RULE 2.2% -> SELL (trigger: EM inflows
+//   >1.5% AUM/4wk). Stack stays x3 (B&B 9.6 + FMS Cash 3.6 + EM Flow) but is
+//   now EM-CENTRIC. China +$21.3bn = 3rd biggest EVER (wk3 confirmed);
+//   EM +$29.6bn 2nd biggest ever; US outflows resume -$7.2bn (all styles neg);
+//   crypto +$0.9bn biggest 11wk; gold +$2.0bn biggest since Apr'26 — Hartnett:
+//   "gold & bitcoin basing in '26"; SECULAR BULL Hong Kong property call.
+//   hullSignals wk15 = null (pipeline unreachable + no committed handoff row
+//   for 7/24) -> verdicts run flow/regime-only; backfill on paste/raw URL.
+//   skew/pcRatio null (source lag) — backfill next session.
+// v2.4.5 = v2.4.4 + wk14 pcRatio backfilled 0.73 (YCharts EQUITY series, Jul 17
+//   value via fresh search index — earlier page-cache served 7/10; series identity
+//   cross-confirmed: YCharts 0.57@7/09 == thetrading.tools equity 0.57@7/09,
+//   MacroMicro 1640 path-consistent 0.62@7/14 -> 0.73@7/17 post-VIX-spike).
+//   Passes <0.85 EQUITY gate. No verdict changes (0.73 not < 0.5 pcLow).
+// v2.4.4 = v2.4.3 + wk14 "Fade Runner" (Flow Show 17 Jul, wk ended 7/15 EPFR) baked
+//   into SEEDED_HISTORY. B&B 9.6 (THIRD stacked sell: FMS Cash Rule fires at 3.6%).
+//   Hull wk14 = carried from committed WEEKLY_LOG wk12-14 (pipeline-computed 7/17
+//   close in PRIOR session; log states "no flips vs wk13", 7 near-flips listed) —
+//   hull-price-pipeline unreachable from this session (repo not indexed for fetch
+//   tool; new error class logged). pcRatio null (YCharts serving 7/10 as latest at
+//   fetch time). emOutflow4wk null (EM Flow Trading Rule table absent from edition).
+//   PLAYBOOK + ROAD MAP statics regenerated to Fade Runner. Footer 13WK -> 14WK.
+// v2.3.1 = v2.3 + LIVE IV from pipeline vol_indices.csv (Yahoo, 52wk W-FRI series):
+//   VIX/VXN/GVZ/VXEFA entries updated with real 52wk ranges + rank percentiles.
+//   VXEEM & RVX confirmed dead (Cboe discontinued) — dependent entries stay STALE.
+//   OVX (45.99) NOT substituted into sec_energy: oil-futures vol scale != XLE IV30
+//   scale — would misread the gauge. sec_energy stays honestly stale.
+// v2.3 = v2.2.2 + VERDICT AUDIT: (1) defensives no longer print outright BUY while
+//   B&B sell signal is live (demoted to WATCH, flow-gated); (2) us_largecap gets a
+//   REDUCE branch on bbXHi + heavy outflow (was HOLD, incoherent vs global_stocks);
+//   (3) gold red-trend + outflow -> WAIT (hull was a dead branch, always HOLD);
+//   (4) EM buy threshold aligned to documented rule (>=3.0, was 2.5) — no seed-week
+//   verdict changes from (4), audited.
+// v2.2.1 = v2.2 + wk12 Hull colors from GitHub price pipeline (model-seeded
+//   HMA(55) weekly proxy, estFlagged; 6 near-flip tickers listed in seed comment).
+// v2.2 = v2.1.1 + HULL NO-READ state: hull null renders gray "NO READ", never
+//   coalesces to red, never enters verdict rules. wk12 seed hull = {} (no read yet).
+//   Ticker now also shown inside the HULL SUITE tile on every signal card.
+// v2.1.1 = v2.1 + TICKER_MAP: Hull-proxy ticker shown on every flow tile and
+//   signal card (EPFR-category proxies, user-confirmed; see TICKER_MAP comment).
+// v2.1 = v2.0 + wk12 "Red, White, and Boom" baked into SEEDED_HISTORY (container-side
+//   seed-splice per rev 1.2: artifact storage is instance-scoped, so the seed is the only
+//   state that travels with the code; weekly patch is now spliced into seed + compile-gated.
+//   No hand-regeneration — file edited on disk, truncation failure mode does not apply.
+// v2.0 = v1.9 + IMPORT WEEK data-patch architecture (Update Protocol v4, Part E):
+//   · NEW: IMPORT WEEK panel — weekly updates are now a small WEEK PATCH JSON pasted
+//     into the app. NO code regeneration for weekly data. Code regen reserved for
+//     structural changes only (Protocol v4 E.5).
+//   · NEW: validateWeekPatch() runs the Protocol sanity gates IN SOFTWARE:
+//       – pcRatio ≥ 0.85 ⇒ REJECT (Total-P/C-series trap, Protocol B.1, logged wk11 6/25)
+//       – skew outside 100–190 ⇒ REJECT · vix outside 5–100 ⇒ REJECT · bb outside 0–10 ⇒ REJECT
+//       – %AUM field |v|>15 ⇒ WARN (likely $bn pasted into %AUM) · $bn |v|>150 ⇒ WARN
+//       – hull values must be red|yellow|green ⇒ REJECT otherwise
+//       – date must be ISO + strictly after last stored week (append-only; no retro-edit)
+//       – missing key = null (never 0) — normalizer fills nulls
+//   · NEW: versioning split (Protocol v4 E.4):
+//       SEED_VERSION = STRUCTURE only (bumped 1.9.0 → 2.0.0; this is a code change).
+//       DATA_VERSION = stamped per accepted patch, lives INSIDE the storage payload.
+//       Weekly imports no longer invalidate friends' shared saves.
+//   · NEW: per-week `title` / `estFlags` / `srcNotes` carried on the week object for
+//     imported weeks (seed weeks keep legacy REPORT_TITLES / EST_FLAGS registries).
+//   · Storage payload shape: { v: SEED_VERSION, dataVersion, history } — payload gains a
+//     field ⇒ shape change ⇒ storage KEY bumped "hartnettPutV1_5" → "hartnettPutV2_0".
+//     Old v1.x saves are superseded; everyone reloads the 11-wk seed once, then patches.
+//   · Seed VALUES unchanged from v1.9 (11 weeks, Apr 12 – Jun 26, wk11 "Small is Big").
+// ─── v2.6.0 (2026-08-08): ถอดไทล์ EM Out 4wk ออกจากแถบ macro (display only).
+//     ฟิลด์ · srcNotes · splice · EM Flow Trading Rule ไม่เปลี่ยนแม้แต่บรรทัดเดียว
+//     ตรวจแล้วว่าอนุสัญญาเครื่องหมายและ threshold ถูกต้องอยู่แล้ว ไม่ต้องแก้
+// ─── v2.5.0 (2026-08-02): wk16 hullSignals BACKFILLED + SKEW live.
+//     Pipeline v1.4 restored: chunked yfinance fetch, and the Cboe vol complex
+//     now fetched via Yahoo rather than FRED (FRED read-times-out from GitHub
+//     runners - cloud-IP throttling, 3 consecutive runs). Hull asof 2026-07-31,
+//     coverage 100%. Values read from the RUN LOG, not the CSV: the committed
+//     file sat behind a CDN cache still serving the 7/24 body - which is why
+//     the full board is now printed to the log every run.
+//     ★ HYG STILL RED (-0.06) after a week when the S&P recovered +1% and the
+//     Nasdaq rallied 3.8% off the low. Credit proxy did NOT follow equities up.
+//     XLE red->green, XLU green->red. MCHI -0.89 -> -0.66, still red.
+// ─── v2.4.9 (2026-08-02): wk16 "Credibility, Intervention & Liquidation"
+//     (edition 31 Jul, EPFR wk ended 7/29). B&B 9.6 -> 9.4 on EM DEBT outflows:
+//     first decline since the sell signal triggered 2026-05-26; still >8 = SELL.
+//     China +$15.9bn = LARGEST 4-WEEK INFLOW EVER ($62.4bn). Tech largest 5-week
+//     inflow ever. Semi ETFs +$5.3bn with SOX -25% = still no positioning unwind.
+//     emOutflow4wk NULL: Rules & Tools table absent this edition, so the EM Flow
+//     Rule status is CARRIED (2.2% SELL, week 2/8), never re-derived.
+//     hullSignals NULL: pipeline blocked since 7/27 (yfinance rate-limit, then
+//     FRED read timeouts); hull_weekly.csv still asof 2026-07-24.
+// ─── v2.4.8 (2026-07-27): wk15 volAux — latest CONFIRMED vol/positioning prints
+//     carried WITH their own as-of dates (same convention as the v1.9 row, which
+//     stored P/C @6/25 and SKEW @6/23 against a later week). No source had
+//     published 7/24 SKEW or equity P/C at splice time (Cboe free mirrors run
+//     T+1..T+4). Rule-facing skew/pcRatio STAY NULL so no verdict can fire on an
+//     off-date value; volAux is display/context only and computeSignal ignores it.
+// ─── v1.9 history (unchanged): P/C 0.67 EQUITY (6/25) & SKEW 143.14 (6/23) sourced ───
+// ─── v1.8 history (unchanged): wk11 ingestion, record tech outflow −9.3bn, vol layer 6/26 ───
+// ═══════════════════════════════════════════════════════════════════════════
+
+// SEED_VERSION stamps the STRUCTURE (code + seed shape). Weekly patches do NOT bump it.
+// Bump BOTH when shipping: TRACKER_VERSION is what a viewer sees on the
+// banner, SEED_VERSION is what the load gate compares. They answer
+// different questions and must not be collapsed into one string.
+const TRACKER_VERSION = "v2.9.0";
+const HULL_ASOF_DISPLAY = "2026-08-21";
+const SEED_VERSION = "2.9.0-wk19-0823"; // wk18 "Strife Begins at Forty" spliced 2026-08-16 (Flow Show 13 Aug edition, EPFR wk ended 8/12); IV_DATA re-spliced same day. SEED CONTENT CHANGED -> bump is REQUIRED: the strict-equality gate below orphans 2.6.0 saves so the new week is actually served. // wk14 "Fade Runner" spliced 2026-07-19 (Flow Show 7/17 edition) // v2.1: wk12 baked into seed (rev 1.2 seed-splice workflow). NOTE: strict-equality load gate below intentionally orphans v2.0 saves — fresh instances start empty anyway; patch replay is the recovery path.
+const STORAGE_KEY  = "hartnettPutV2_0"; // bumped: payload shape changed (added dataVersion)
+
+async function saveHistory(history, dataVersion) {
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify({ v: SEED_VERSION, dataVersion: dataVersion || "seed", history }), true);
+  } catch (e) { console.error("save error", e); }
+}
+async function loadHistory() {
+  try {
+    const r = await window.storage.get(STORAGE_KEY, true);
+    if (!r) return null;
+    const parsed = JSON.parse(r.value);
+    if (!parsed || parsed.v !== SEED_VERSION) return null; // structure changed → fresh seed
+    if (!Array.isArray(parsed.history)) return null;
+    return { history: parsed.history, dataVersion: parsed.dataVersion || "seed" };
+  } catch { return null; }
+}
+async function clearHistory() {
+  try { await window.storage.delete(STORAGE_KEY, true); } catch (e) { console.error("clear error", e); }
+}
+
+const hasVal = v => v !== null && v !== undefined;
+const fmtNum = (v, digits = 1, suffix = "") => (hasVal(v) ? v.toFixed(digits) + suffix : "—");
+
+const ASSET_GROUPS = {
+  "Core Assets": [
+    { id: "china_stocks", label: "China Stocks",    region: "EM/Asia" },
+    { id: "em",           label: "EM Equities",     region: "EM/Asia" },
+    { id: "sox",          label: "SOX / Semis",     region: "US Tech" },
+    { id: "sec_tech",     label: "US Technology",   region: "US Tech" },
+    { id: "gold",         label: "Gold",            region: "Commodities" },
+    { id: "bonds",        label: "HY Bonds",        region: "Fixed Income" },
+    { id: "crypto",       label: "Bitcoin / Crypto",region: "Crypto" },
+  ],
+  "Global Equities": [
+    { id: "global_stocks", label: "Global Stocks",   region: "Global" },
+    { id: "japan_stocks",  label: "Japan Stocks",    region: "DM Asia" },
+    { id: "europe_stocks", label: "Europe Stocks",   region: "DM Europe" },
+    { id: "china_stocks",  label: "China Stocks",    region: "EM/Asia" },
+    { id: "ig_bonds",      label: "IG Bonds",        region: "Fixed Income" },
+    { id: "precious_metals", label: "Precious Metals",region: "Commodities" },
+  ],
+  "US Style": [
+    { id: "us_largecap",   label: "US Large Cap",    region: "US Style" },
+    { id: "us_value",      label: "US Value",        region: "US Style" },
+    { id: "us_smallcap",   label: "US Small Cap",    region: "US Style" },
+    { id: "us_growth",     label: "US Growth",       region: "US Style" },
+  ],
+  "US Sectors": [
+    { id: "sec_tech",      label: "Technology",      region: "US Sector" },
+    { id: "sec_consumer",  label: "Consumer",        region: "US Sector" },
+    { id: "sec_utilities", label: "Utilities",       region: "US Sector" },
+    { id: "sec_financials",label: "Financials",      region: "US Sector" },
+    { id: "sec_realestate",label: "Real Estate",     region: "US Sector" },
+    { id: "sec_comsvs",    label: "Com Services",    region: "US Sector" },
+    { id: "sec_hcare",     label: "Healthcare",      region: "US Sector" },
+    { id: "sec_energy",    label: "Energy",          region: "US Sector" },
+    { id: "sec_materials", label: "Materials",       region: "US Sector" },
+  ],
+  "EM Breakdown": [
+    { id: "em_total",  label: "EM Total",            region: "EM" },
+    { id: "em_brazil", label: "Brazil",              region: "EM" },
+    { id: "em_india",  label: "India",               region: "EM" },
+    { id: "em_china",  label: "China (EM)",          region: "EM" },
+  ],
+};
+
+const ALL_ASSETS = Object.values(ASSET_GROUPS).flat().filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i);
+
+// Flow keys that are legal in a WEEK PATCH (tile assets + non-tile series kept in flows)
+const KNOWN_FLOW_IDS = new Set([...ALL_ASSETS.map(a => a.id), "hk", "thailand", "ustech"]);
+
+// ── IV DATA (carried v1.8/1.9) — ALL SOURCED or NULL, NO ESTIMATE ─────────────
+// ── IV_DATA — RE-SPLICED 2026-08-16 from board.json asof 2026-08-14 ──────────
+// ⚠️ BEFORE THIS FIX this block was frozen at pipeline 7/17 and older, with
+// several entries sourced from AlphaQuery snapshots taken in MAY. It fed
+// computeIV() -> ivRegime -> putVerdict, so the tracker was issuing
+// BUY PUT / HOLD OFF calls off vol readings up to 100 days old.
+// The worst case: VIX was carried at 18.77 "67%ile/52wk" while the live print
+// is 14.25 at the 2.8%ile — that is not a small drift, it inverts the reading
+// from mid-range to near the calm extreme, which is the whole basis of a
+// "puts are cheap" decision.
+//
+// RULE APPLIED: iv is populated ONLY from a series board.json actually serves.
+// Everything else is null. A null yields ivRegime "NO DATA" / putVerdict
+// "HOLD OFF", which is the correct output for an unsourced input — the same
+// Sourced-or-null rule that caught the 2019 put/call archive file.
+// ivLo / ivHi / putBuy / putThresh are DESIGN BANDS, not observations, and are
+// deliberately left unchanged.
+const IV_ASOF = "2026-08-21";
+const IV_DATA = {
+  // ── live from board.json vol_indices asof 2026-08-14 ──────────────────────
+  us_largecap:   { iv: 15.13, pct: 11.9, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 27, src: "VIX 15.13 · board 8/21 · up from 14.25/2.8%ile" },
+  global_stocks: { iv: 15.13, pct: 11.9, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 26, src: "VIX 15.13 proxy · board 8/21" },
+  ustech:        { iv: 21.98, pct: 36.5, ivLo: 17.2, ivHi: 33.5, putBuy: 19, putThresh: 34, src: "VXN 21.98 · board 8/21" },
+  sec_tech:      { iv: 21.98, pct: 36.5, ivLo: 17.2, ivHi: 33.5, putBuy: 20, putThresh: 35, src: "VXN 21.98 proxy · board 8/21" },
+  gold:          { iv: 27.29, pct: 67.5, ivLo: 15.2, ivHi: 45.5, putBuy: 16, putThresh: 34, src: "GVZ 27.29 · board 8/21 · JUMPED 34.9 -> 67.5%ile in one week while gold flow stayed positive" },
+
+  // ── present but STALE in board.json (asof 2026-07-17, 28 days) ────────────
+  em_brazil:     { iv: 29.32, pct: 47.2, stale: true, ivLo: 8.1, ivHi: 56.8, putBuy: 25, putThresh: 44, src: "VXEWZ 29.32 · board asof 7/17 ⚠35d — no current read into Oct 4 election" },
+  japan_stocks:  { iv: 16.58, pct: 20.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 17, putThresh: 27, src: "VXEFA 16.58 · board asof 7/17 ⚠35d — regional, not JP-specific" },
+  europe_stocks: { iv: 16.58, pct: 20.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 15, putThresh: 25, src: "VXEFA 16.58 · board asof 7/17 ⚠35d — regional, not EU-specific" },
+
+  // ── pipeline reports NULL (Yahoo does not serve these) — was carrying
+  //    hardcoded numbers before this fix. Sourced-or-null now enforced.
+  us_smallcap:   { iv: null, ivLo: 16, ivHi: 42, putBuy: 22, putThresh: 37, src: "RVX null in board 8/21 — was 26.21 FRED 6/09; still null 8/21" },
+  em:            { iv: null, ivLo: 13.4, ivHi: 42.8, putBuy: 18, putThresh: 34, src: "VXEEM null in board 8/21 (still null) — was ~32.7 hardcoded" },
+  em_total:      { iv: null, ivLo: 13.4, ivHi: 42.8, putBuy: 18, putThresh: 34, src: "VXEEM null in board 8/21 (still null) — was ~32.7 hardcoded" },
+  china_stocks:  { iv: null, ivLo: 18, ivHi: 50, putBuy: 22, putThresh: 40, src: "VXFXI null in board 8/21 (still null) — was ~24.7 hardcoded" },
+  em_china:      { iv: null, ivLo: 18, ivHi: 50, putBuy: 22, putThresh: 40, src: "VXFXI null in board 8/21 (still null) — was ~24.7 hardcoded" },
+  bonds:         { iv: null, ivLo: 6,  ivHi: 8.2, putBuy: 6,  putThresh: 12, src: "VXHYG null in board 8/21 (still null) — was 6.51, date never verified" },
+
+  // ── never in the pipeline; last values were AlphaQuery snapshots 60-100
+  //    days old, well past MAX_SOURCE_AGE_DAYS = 10. Nulled.
+  sox:           { iv: null, ivLo: 26, ivHi: 65, putBuy: 38, putThresh: 60, src: "SMH IV30 not piped — was 46.1 AlphaQuery 5/19 (89d)" },
+  sec_financials:{ iv: null, ivLo: 10, ivHi: 33, putBuy: 15, putThresh: 29, src: "XLF IV30 not piped — was 17.4 AlphaQuery 5/27 (81d)" },
+  precious_metals:{ iv: null, ivLo: 25, ivHi: 66, putBuy: 30, putThresh: 55, src: "SLV IV30 not piped — was 44.7 AlphaQuery 6/17 (60d). GVZ is GOLD vol, not a silver/PM-basket proxy — do not substitute" },
+  crypto:        { iv: null, ivLo: 40, ivHi: 105, putBuy: 50, putThresh: 88, src: "IBIT IV30 not piped — was 52.3 AlphaQuery 6/05 (72d)" },
+  sec_energy:    { iv: null, ivLo: 18, ivHi: 36, putBuy: 22, putThresh: 33, src: "XLE IV30 not piped — was 25.6 AlphaQuery 5/08 (100d). OVX 49.62 IS in board 8/21 but measures CRUDE vol, not XLE equity vol — different underlying, do not substitute" },
+
+  // ── no Cboe index exists for these — structurally null, unchanged ─────────
+  us_value:      { iv: null, ivLo: 9,  ivHi: 26, putBuy: 13, putThresh: 23, src: "no Cboe index — null" },
+  us_growth:     { iv: null, ivLo: 13, ivHi: 40, putBuy: 21, putThresh: 36, src: "no Cboe index — null" },
+  sec_materials: { iv: null, ivLo: 14, ivHi: 30, putBuy: 19, putThresh: 29, src: "no Cboe sector index — null" },
+  sec_consumer:  { iv: null, ivLo: 11, ivHi: 30, putBuy: 15, putThresh: 27, src: "no Cboe sector index — null" },
+  sec_utilities: { iv: null, ivLo: 8,  ivHi: 22, putBuy: 11, putThresh: 19, src: "no Cboe sector index — null" },
+  sec_realestate:{ iv: null, ivLo: 10, ivHi: 28, putBuy: 15, putThresh: 25, src: "no Cboe sector index — null" },
+  sec_comsvs:    { iv: null, ivLo: 12, ivHi: 33, putBuy: 17, putThresh: 29, src: "no Cboe sector index — null" },
+  sec_hcare:     { iv: null, ivLo: 9,  ivHi: 26, putBuy: 13, putThresh: 23, src: "no Cboe sector index — null" },
+  em_india:      { iv: null, ivLo: 14, ivHi: 34, putBuy: 19, putThresh: 31, src: "no Cboe INDA index — null" },
+  hk:            { iv: null, ivLo: 14, ivHi: 36, putBuy: 18, putThresh: 31, src: "no Cboe EWH index — null" },
+  thailand:      { iv: null, ivLo: 12, ivHi: 32, putBuy: 17, putThresh: 28, src: "no Cboe index — null" },
+  ig_bonds:      { iv: null, ivLo: 5,  ivHi: 13, putBuy: 7,  putThresh: 11, src: "VXLQD not piped — null" },
+};
+function getIVData(assetId) {
+  // was: iv 20 invented for any unmapped asset. Unmapped = unsourced = null.
+  return IV_DATA[assetId] || { iv: null, ivLo: 12, ivHi: 30, putBuy: 15, putThresh: 25, src: "unmapped asset — null" };
+}
+
+function computeIV(assetId, week) {
+  const d = getIVData(assetId);
+  const { bb } = week;
+  if (!hasVal(d.iv)) {
+    return {
+      fairIV: null, impliedIV: null, ivRegime: "NO DATA", putVerdict: "HOLD OFF", ivRatio: null,
+      dte: "—", strike: "—", structure: "—", ivPct52wk: null, pctEst: false,
+      ivAsOf: IV_ASOF, ivStale: !!d.stale, src: d.src,
+      putBuy: d.putBuy, putThresh: d.putThresh, ivLo: d.ivLo, ivHi: d.ivHi,
+    };
+  }
+  const impliedIV  = d.iv;
+  const fairIV     = +((d.ivLo + d.ivHi) / 2).toFixed(1);
+  const ivRatio    = +(impliedIV / fairIV).toFixed(2);
+  // ⚠️ FIXED 2026-08-16 (2nd pass). ivPct52wk used to be derived ENTIRELY from
+  // ivLo/ivHi — two hand-set design bands — while being labelled "%ile/52wk" in
+  // the UI. That is a false label, not a rounding difference: measured against
+  // board.json 8/14 it was off by 5-8 points on every live series
+  //     VIX  band-derived 3.7%  vs real 2.8%
+  //     VXN  band-derived 21.6% vs real 29.4%
+  //     GVZ  band-derived 28.8% vs real 34.9%
+  // and the UI colours the tile green at <=30 / red at >=75, so an 8-point
+  // error can flip the colour. board.json already ships pct_52w computed from
+  // 252 trading days; use it when present. Band-derived is kept ONLY as a
+  // fallback and is flagged pctEst so the display can say so.
+  const pctReal    = hasVal(d.pct);
+  const ivPct52wk  = pctReal ? +Number(d.pct).toFixed(0)
+    : +Math.min(100, Math.max(0,
+        ((impliedIV - d.ivLo) / (d.ivHi - d.ivLo)) * 100
+      )).toFixed(0);
+
+  let ivRegime;
+  if      (impliedIV <= d.putBuy)                     ivRegime = "CHEAP";
+  else if (impliedIV >= d.putThresh)                  ivRegime = "EXPENSIVE";
+  else if (impliedIV >= d.putThresh * 0.88)           ivRegime = "ELEVATED";
+  else if (impliedIV <= d.putBuy * 1.25)              ivRegime = "SUPPRESSED";
+  else                                                ivRegime = "FAIR";
+
+  let putVerdict = "HOLD OFF";
+  const flowSignal = computeSignal(assetId, week);
+
+  if (["AVOID / PUT", "REDUCE"].includes(flowSignal)) {
+    if      (ivRegime === "CHEAP" || ivRegime === "SUPPRESSED") putVerdict = "BUY PUT ★";
+    else if (ivRegime === "FAIR")                               putVerdict = "BUY PUT";
+    else if (ivRegime === "ELEVATED")                           putVerdict = "SPREAD";
+    else                                                        putVerdict = "WAIT IV";
+  } else if (flowSignal === "WATCH" && (ivRegime === "CHEAP" || ivRegime === "SUPPRESSED")) {
+    putVerdict = "PREP";
+  }
+
+  const stale = !!d.stale;
+  if (stale) putVerdict = "HOLD OFF";
+
+  const dte = (ivRegime === "CHEAP" || ivRegime === "SUPPRESSED") ? "90-120 DTE"
+            : ivRegime === "FAIR"                                  ? "60-90 DTE"
+            : ivRegime === "ELEVATED"                              ? "45 DTE / spread"
+            : "Bear spread only";
+
+  const strike = bb >= 8.5 ? "OTM 5-10%"
+               : bb >= 8.0 ? "OTM 5-7%"
+               : bb >= 7.0 ? "OTM 3-5%"
+               : "ATM-OTM 2%";
+
+  const structure = (ivRegime === "EXPENSIVE" || ivRegime === "ELEVATED")
+    ? "Bear Put Spread" : "Outright Put";
+
+  return {
+    fairIV, impliedIV, ivRegime, putVerdict, ivRatio, stale,
+    dte, strike, structure, ivPct52wk, pctEst: !pctReal, ivAsOf: IV_ASOF, ivStale: !!d.stale,
+    src: d.src,
+    putBuy: d.putBuy, putThresh: d.putThresh, ivLo: d.ivLo, ivHi: d.ivHi,
+  };
+}
+
+// Legacy titles for the 11 seed weeks. Imported weeks carry week.title instead.
+const REPORT_TITLES = [
+  "Stock Vigilantes", "Stocksmaxxing", "Boom Loop", "Material World",
+  "Mississippi Churning", "Ground Control", "Post-Bubble", "Wealth Up Biz",
+  "Give Ps a Chance",  // wk9
+  "V for Victory",     // wk10
+  "Small is Big",      // wk11 — Flow Show 28 Jun, wk ended 06/24
+];
+const titleOf = (w, i) => w.title || REPORT_TITLES[i] || "";
+
+const SEEDED_HISTORY = [
+  {
+    date: "2026-04-12",
+    bb: 6.3, pcRatio: 0.43, skew: 131, vix: 17.5, emOutflow4wk: 0.4, cashLevel: 4.4,
+    flows: {
+      hk: 0.0, em: 0.1, thailand: 0.0,
+      global_stocks: 36.8, japan_stocks: -2.1, europe_stocks: 0.7, china_stocks: -0.2,
+      em_total: 0.1, em_brazil: 0.1, em_india: -0.5, em_china: -0.2,
+      sox: 0.4, ustech: 0.4, gold: 3.5, bonds: 1.6, crypto: 0.2,
+      ig_bonds: 0.1, precious_metals: 3.5,
+      us_largecap: 27.0, us_value: 0.4, us_smallcap: -3.3, us_growth: -0.9,
+      sec_tech: 0.4, sec_consumer: -0.6, sec_utilities: 0.4, sec_financials: -0.5,
+      sec_realestate: -0.3, sec_comsvs: 0.1, sec_hcare: -0.9, sec_energy: -1.4, sec_materials: 2.1,
+    },
+    hullSignals: {
+      hk: "yellow", em: "yellow", thailand: "red", sox: "green", ustech: "green",
+      gold: "green", bonds: "green", crypto: "yellow",
+      global_stocks: "green", japan_stocks: "red", europe_stocks: "yellow", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "green",
+      us_largecap: "green", us_value: "yellow", us_smallcap: "red", us_growth: "yellow",
+      sec_tech: "green", sec_consumer: "red", sec_utilities: "yellow", sec_financials: "yellow",
+      sec_realestate: "yellow", sec_comsvs: "yellow", sec_hcare: "red", sec_energy: "red", sec_materials: "green",
+      em_total: "yellow", em_brazil: "yellow", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-04-19",
+    bb: 6.3, pcRatio: 0.40, skew: 133, vix: 16.5, emOutflow4wk: 1.0, cashLevel: 4.3,
+    flows: {
+      hk: -0.4, em: -0.4, thailand: -0.2,
+      global_stocks: 11.3, japan_stocks: -4.4, europe_stocks: -4.7, china_stocks: -1.4,
+      em_total: -0.4, em_brazil: 0.1, em_india: -0.3, em_china: -1.4,
+      sox: -3.8, ustech: -3.8, gold: 1.2, bonds: 3.1, crypto: 1.2,
+      ig_bonds: 5.1, precious_metals: 1.2,
+      us_largecap: 15.9, us_value: -1.5, us_smallcap: 1.0, us_growth: -1.6,
+      sec_tech: -3.8, sec_consumer: -0.2, sec_utilities: 0.1, sec_financials: -2.4,
+      sec_realestate: -0.7, sec_comsvs: 0.5, sec_hcare: -0.0004, sec_energy: 0.0015, sec_materials: 0.2,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "red", ustech: "yellow",
+      gold: "green", bonds: "green", crypto: "yellow",
+      global_stocks: "green", japan_stocks: "red", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "green",
+      us_largecap: "green", us_value: "yellow", us_smallcap: "yellow", us_growth: "yellow",
+      sec_tech: "red", sec_consumer: "red", sec_utilities: "red", sec_financials: "red",
+      sec_realestate: "red", sec_comsvs: "yellow", sec_hcare: "red", sec_energy: "yellow", sec_materials: "yellow",
+      em_total: "red", em_brazil: "yellow", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-04-30",
+    bb: 6.6, pcRatio: 0.40, skew: 136, vix: 15.8, emOutflow4wk: 1.5, cashLevel: 4.1,
+    flows: {
+      hk: -0.3, em: -0.4, thailand: -0.3,
+      global_stocks: 23.0, japan_stocks: 6.7, europe_stocks: -3.4, china_stocks: -1.4,
+      em_total: -0.4, em_brazil: 0.1, em_india: -0.3, em_china: -1.4,
+      sox: 3.0, ustech: 3.0, gold: -1.2, bonds: 2.1, crypto: -0.2,
+      ig_bonds: 8.8, precious_metals: -1.2,
+      us_largecap: 16.3, us_value: 1.0, us_smallcap: 0.9, us_growth: 0.1,
+      sec_tech: 3.0, sec_consumer: -0.7, sec_utilities: -0.6, sec_financials: -0.5,
+      sec_realestate: -0.6, sec_comsvs: 0.7, sec_hcare: -1.1, sec_energy: 0.7, sec_materials: -0.2,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "yellow", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "yellow",
+      us_largecap: "green", us_value: "green", us_smallcap: "yellow", us_growth: "green",
+      sec_tech: "green", sec_consumer: "green", sec_utilities: "red", sec_financials: "red",
+      sec_realestate: "green", sec_comsvs: "green", sec_hcare: "red", sec_energy: "green", sec_materials: "yellow",
+      em_total: "red", em_brazil: "yellow", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-05-10",
+    bb: 7.2, pcRatio: 0.40, skew: 136, vix: 15.8, emOutflow4wk: 1.6, cashLevel: 4.3,
+    flows: {
+      hk: -0.4, em: -0.4, thailand: -0.4,
+      global_stocks: 2.6, japan_stocks: 0.5, europe_stocks: -2.1, china_stocks: -1.5,
+      em_total: -0.4, em_brazil: 0.2, em_india: -0.2, em_china: -1.5,
+      sox: null, ustech: null, gold: -1.2, bonds: 1.8, crypto: 1.9,
+      ig_bonds: 16.4, precious_metals: -1.2,
+      us_largecap: 8.1, us_value: 2.3, us_smallcap: 1.5, us_growth: -5.5,
+      sec_tech: -2.7, sec_consumer: -1.1, sec_utilities: -0.1, sec_financials: 0.6,
+      sec_realestate: -0.1, sec_comsvs: 0.0, sec_hcare: -1.0, sec_energy: 2.6, sec_materials: 1.9,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "green", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "green",
+      us_largecap: "green", us_value: "green", us_smallcap: "green", us_growth: "yellow",
+      sec_tech: "green", sec_consumer: "red", sec_utilities: "red", sec_financials: "yellow",
+      sec_realestate: "yellow", sec_comsvs: "yellow", sec_hcare: "red", sec_energy: "green", sec_materials: "red",
+      em_total: "red", em_brazil: "yellow", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-05-14",
+    bb: 7.6, pcRatio: 0.40, skew: 136, vix: 15.5, emOutflow4wk: 1.7, cashLevel: 4.1,
+    flows: {
+      hk: -0.8, em: -0.8, thailand: -0.8,
+      global_stocks: 20.5, japan_stocks: 4.6, europe_stocks: -1.5, china_stocks: -1.5,
+      em_total: -0.8, em_brazil: 0.2, em_india: -0.2, em_china: -1.5,
+      sox: null, ustech: null, gold: 2.0, bonds: 1.0, crypto: -1.3,
+      ig_bonds: 14.0, precious_metals: 2.0,
+      us_largecap: 24.4, us_value: -0.3, us_smallcap: -1.5, us_growth: -3.0,
+      sec_tech: 5.4, sec_consumer: -1.0, sec_utilities: -0.056, sec_financials: 0.7,
+      sec_realestate: 0.6, sec_comsvs: 0.09, sec_hcare: 0.5, sec_energy: -0.5, sec_materials: 0.4,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "green", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "green",
+      us_largecap: "green", us_value: "yellow", us_smallcap: "red", us_growth: "yellow",
+      sec_tech: "green", sec_consumer: "red", sec_utilities: "red", sec_financials: "red",
+      sec_realestate: "green", sec_comsvs: "red", sec_hcare: "green", sec_energy: "yellow", sec_materials: "red",
+      em_total: "red", em_brazil: "yellow", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-05-22",
+    bb: 8.0, pcRatio: 0.39, skew: 137, vix: 15.5, emOutflow4wk: 1.8, cashLevel: 3.9,
+    flows: {
+      hk: -0.3, em: -0.3, thailand: -0.3,
+      global_stocks: 2.4, japan_stocks: -4.4, europe_stocks: -2.3, china_stocks: -1.5,
+      em_total: -0.3, em_brazil: 0.2, em_india: -0.2, em_china: -1.5,
+      sox: 9.0, ustech: 9.0, gold: -1.1, bonds: 30.5, crypto: -1.5,
+      ig_bonds: 13.3, precious_metals: -1.1,
+      us_largecap: 7.3, us_value: 1.4, us_smallcap: -2.6, us_growth: -4.8,
+      sec_tech: 9.0, sec_consumer: 0.6, sec_utilities: -0.1, sec_financials: -2.4,
+      sec_realestate: 0.1, sec_comsvs: 0.4, sec_hcare: -0.2, sec_energy: 0.3, sec_materials: -1.8,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "green", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "yellow", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "yellow",
+      us_largecap: "green", us_value: "green", us_smallcap: "red", us_growth: "yellow",
+      sec_tech: "green", sec_consumer: "green", sec_utilities: "red", sec_financials: "red",
+      sec_realestate: "yellow", sec_comsvs: "green", sec_hcare: "red", sec_energy: "yellow", sec_materials: "red",
+      em_total: "red", em_brazil: "green", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-05-29",
+    bb: 8.5, pcRatio: 0.39, skew: 138, vix: 15.3, emOutflow4wk: 2.0, cashLevel: 3.9,
+    flows: {
+      hk: -0.5, em: -0.5, thailand: -0.5,
+      global_stocks: -7.0, japan_stocks: -8.2, europe_stocks: -1.6, china_stocks: -2.0,
+      em_total: -0.5, em_brazil: -0.2, em_india: -0.5, em_china: -2.0,
+      sox: 0.3, ustech: 0.3, gold: -1.0, bonds: 0.7, crypto: -1.2,
+      ig_bonds: 12.3, precious_metals: -1.0,
+      us_largecap: 11.2, us_value: 1.3, us_smallcap: 0.2, us_growth: -3.5,
+      sec_tech: 0.3, sec_consumer: 0.7, sec_utilities: -0.2, sec_financials: -0.4,
+      sec_realestate: 0.1, sec_comsvs: -0.6, sec_hcare: -0.8, sec_energy: -1.4, sec_materials: -2.3,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "yellow", bonds: "green", crypto: "red",
+      global_stocks: "yellow", japan_stocks: "red", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "yellow",
+      us_largecap: "green", us_value: "green", us_smallcap: "yellow", us_growth: "red",
+      sec_tech: "yellow", sec_consumer: "green", sec_utilities: "red", sec_financials: "red",
+      sec_realestate: "yellow", sec_comsvs: "red", sec_hcare: "red", sec_energy: "red", sec_materials: "red",
+      em_total: "red", em_brazil: "red", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-06-05",
+    bb: 8.7, pcRatio: 0.67, skew: 145, vix: 21.51, emOutflow4wk: 2.0, cashLevel: 3.9,
+    flows: {
+      em: -0.4, em_total: -0.4, china_stocks: -1.4, em_china: -1.4, em_brazil: -0.9, em_india: -0.8,
+      hk: -0.4, thailand: -0.4, global_stocks: -3.0, japan_stocks: -1.5, europe_stocks: -2.5,
+      sox: 0.2, ustech: 0.2, gold: -3.1, bonds: 3.2, crypto: -2.0, ig_bonds: 20.1, precious_metals: -3.1,
+      us_largecap: 18.3, us_value: -5.9, us_smallcap: 1.6, us_growth: -13.1,
+      sec_tech: 0.2, sec_consumer: -1.7, sec_utilities: 0.8, sec_financials: -2.0,
+      sec_realestate: 0.6, sec_comsvs: -0.4, sec_hcare: -0.4, sec_energy: -0.2, sec_materials: -1.3,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "yellow", ustech: "yellow",
+      gold: "yellow", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "red", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "yellow",
+      us_largecap: "green", us_value: "red", us_smallcap: "green", us_growth: "red",
+      sec_tech: "yellow", sec_consumer: "red", sec_utilities: "green", sec_financials: "red",
+      sec_realestate: "green", sec_comsvs: "red", sec_hcare: "red", sec_energy: "red", sec_materials: "red",
+      em_total: "red", em_brazil: "red", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-06-12",
+    bb: 8.8, pcRatio: 0.54, skew: 142.6, vix: 17.68, emOutflow4wk: null, cashLevel: null,
+    flows: {
+      em: 0.2, em_total: 0.2, china_stocks: -0.3, em_china: -0.3, em_brazil: -0.9, em_india: -0.6,
+      hk: null, thailand: null,
+      global_stocks: 31.5, japan_stocks: 0.8, europe_stocks: -3.9,
+      sox: null, ustech: null,
+      gold: -2.3, precious_metals: -2.3, bonds: -0.2, crypto: -0.7, ig_bonds: 11.8,
+      us_largecap: 11.3, us_value: -1.8, us_smallcap: -1.1, us_growth: -4.5,
+      sec_tech: 12.3, sec_comsvs: 1.1, sec_financials: 1.0, sec_hcare: 0.7,
+      sec_realestate: -0.1, sec_utilities: -0.3, sec_energy: -0.6, sec_consumer: -1.4, sec_materials: -2.0,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "yellow", ustech: "yellow",
+      gold: "yellow", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "red", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "yellow",
+      us_largecap: "green", us_value: "red", us_smallcap: "green", us_growth: "red",
+      sec_tech: "yellow", sec_consumer: "red", sec_utilities: "green", sec_financials: "red",
+      sec_realestate: "green", sec_comsvs: "red", sec_hcare: "red", sec_energy: "red", sec_materials: "red",
+      em_total: "red", em_brazil: "red", em_india: "red", em_china: "red",
+    },
+  },
+  {
+    date: "2026-06-19",
+    bb: 9.2, pcRatio: 0.58, skew: 142.62, vix: 16.78, emOutflow4wk: null, cashLevel: null,
+    flows: {
+      em: -0.3, em_total: -0.3, china_stocks: -1.4, em_china: -1.4, em_brazil: -0.3, em_india: -0.5,
+      hk: null, thailand: null,
+      global_stocks: 126.4, japan_stocks: 1.2, europe_stocks: -1.2,
+      sox: null, ustech: null,
+      gold: -2.9, precious_metals: -2.9, bonds: 2.2, crypto: null, ig_bonds: 10.3,
+      us_largecap: 60.5, us_value: 11.4, us_smallcap: 12.3, us_growth: 1.6,
+      sec_tech: 19.2, sec_financials: 1.1, sec_materials: 1.0, sec_realestate: 0.9,
+      sec_comsvs: 0.8, sec_hcare: 0.1, sec_utilities: -0.3, sec_consumer: -0.4, sec_energy: -0.7,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "green", ustech: "green",
+      gold: "red", bonds: "green", crypto: "red",
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "yellow", precious_metals: "red",
+      us_largecap: "green", us_value: "green", us_smallcap: "green", us_growth: "green",
+      sec_tech: "green", sec_consumer: "red", sec_utilities: "red", sec_financials: "green",
+      sec_realestate: "yellow", sec_comsvs: "yellow", sec_hcare: "yellow", sec_energy: "red", sec_materials: "green",
+      em_total: "red", em_brazil: "yellow", em_india: "yellow", em_china: "red",
+    },
+  },
+  // ── Week 11: Jun 26 ── "Small is Big" (Flow Show 28 Jun, wk ended 06/24) ──
+  // pcRatio 0.67 = CBOE EQUITY P/C (6/25); skew 143.14 = ^SKEW (6/23). Sourced, not estimated.
+  {
+    date: "2026-06-26",
+    bb: 9.1, pcRatio: 0.67, skew: 143.14, vix: 18.41, emOutflow4wk: null, cashLevel: null,
+    flows: {
+      em: -0.4, em_total: -0.4, china_stocks: -1.6, em_china: -1.6, em_brazil: -0.9, em_india: -0.1,
+      hk: null, thailand: null,
+      global_stocks: -5.0, japan_stocks: 0.5, europe_stocks: -1.3,
+      sox: null, ustech: null,
+      gold: -0.4, precious_metals: -0.4, bonds: 1.8, crypto: null, ig_bonds: 9.0,
+      us_largecap: 28.6, us_value: 5.8, us_smallcap: -9.2, us_growth: 1.2,
+      sec_tech: -9.3, sec_materials: -2.2, sec_financials: -1.0, sec_energy: -1.5,
+      sec_comsvs: -0.5, sec_consumer: -0.1, sec_realestate: 0.9, sec_hcare: 0.3, sec_utilities: 0.1,
+    },
+    hullSignals: {
+      hk: "red", em: "red", thailand: "red", sox: "yellow", ustech: "yellow",
+      gold: "red", bonds: "green", crypto: "red",
+      global_stocks: "yellow", japan_stocks: "green", europe_stocks: "red", china_stocks: "red",
+      ig_bonds: "green", precious_metals: "red",
+      us_largecap: "yellow", us_value: "green", us_smallcap: "yellow", us_growth: "red",
+      sec_tech: "yellow", sec_consumer: "red", sec_utilities: "yellow", sec_financials: "red",
+      sec_realestate: "green", sec_comsvs: "yellow", sec_hcare: "yellow", sec_energy: "red", sec_materials: "yellow",
+      em_total: "red", em_brazil: "red", em_india: "yellow", em_china: "red",
+    },
+  },
+  // ── Week 12: Jul 3 ── "Red, White, and Boom" (Flow Show 2 Jul, wk ended 7/1) ──
+  // Baked from WEEK PATCH wk12-2026-07-03 (Protocol v4 Part E → seed-splice, rev 1.2 amendment).
+  // 7/3 = US market holiday (Jul 4 on Saturday): vix/pcRatio/skew are 7/2 closes, as-of flagged.
+  // hullSignals = APP DEFAULTS (all red), NOT a user read — PENDING: send Hull reads for next splice.
+  {
+    date: "2026-07-03",
+    title: "Red, White, and Boom",
+    bb: 9.5, pcRatio: 0.53, skew: 150.02, vix: 16.15, emOutflow4wk: 0.7, cashLevel: 4.1,
+    flows: {
+      em: -0.1, em_total: -0.1, china_stocks: -0.9, em_china: -0.9, em_brazil: -0.7, em_india: -0.3,
+      hk: null, thailand: null,
+      global_stocks: -13.9, japan_stocks: 1.9, europe_stocks: -3.7,
+      sox: null, ustech: null,
+      gold: -3.0, precious_metals: -3.0, bonds: 3.4, crypto: -2.0, ig_bonds: 17.2,
+      us_largecap: -11.0, us_value: -15.8, us_smallcap: -3.0, us_growth: -13.3,
+      sec_tech: 14.4, sec_comsvs: 2.4, sec_financials: 2.2, sec_hcare: 1.6,
+      sec_utilities: 0.2, sec_consumer: 0.048, sec_realestate: -0.2,
+      sec_energy: -3.2, sec_materials: -3.8,
+    },
+    // wk12 Hull = MODEL-SEEDED PROXY (est), not a chart read. Computed 2026-07-06:
+    // Hull Suite HMA(55) weekly, close, W-FRI; color = hma vs hma[2]; binary green/red.
+    // Data: hull-price-pipeline repo (Yahoo/yfinance, single provider), 70 wk bars,
+    // ETF closes as-of 7/2 (7/3 holiday), BTC partial 7/10 bar dropped.
+    // NEAR FLIP (|margin|<0.30%) — verify on chart before any entry decision:
+    // bonds/HYG +0.04, ig_bonds/LQD -0.04, sec_hcare +0.17, sec_utilities +0.08,
+    // sec_energy +0.16, sec_consumer/XLY -0.21.
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "red", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "green", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "green", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "green", sec_consumer: "red",
+    },
+    estFlags: { hullSignals: "model-seeded HMA(55) weekly proxy — not a user chart read" },
+    srcNotes: {
+      bb: "Flow Show 7/2/26 p.2 'rises to 9.5 from 9.1'",
+      cashLevel: "Table 4 FMS Cash Indicator 4.1%, same edition",
+      emOutflow4wk: "Table 4 EM Flow Trading Rule -0.7% 4wk %AUM, stored as outflow magnitude",
+      vix: "Yahoo ^VIX close 16.15 as-of 2026-07-02 (7/3 holiday)",
+      pcRatio: "YCharts cboe_equity_put_call_ratio EQUITY 0.53, 2026-07-02",
+      skew: "^SKEW 150.02 close 2026-07-02, Yahoo + Investing.com",
+      sec_consumer: "By-sector consumer $48mn -> 0.048 $bn unit conversion",
+      sec_materials: "By-sector -3.8 used; Flows-to-Know cites -6.8 (conflict logged wk12 patch)",
+      hull: "HMA(55) wkly proxy, Yahoo closes via hull-price-pipeline repo, computed 2026-07-06; TICKER_MAP proxies, not holdings",
+    },
+  },
+  // ── Week 13: Jul 10 ── "No landing, no cut, no hike, no sweep, no bears"
+  // (Flow Show 9 Jul, wk ended 7/8). Spliced Fri 7/10 BEFORE US close: Hull = null
+  // (W-FRI bar incomplete — partial-bar rule), vix as-of 7/9, pcRatio/skew = null
+  // pending (skew not yet in pipeline — backlog: add ^SKEW to VOL_TICKERS).
+  // REGIME NOTE: Global Flow Trading Rule flipped to SELL (1.1% > 1.0 trigger) —
+  // SECOND contrarian sell now stacked on B&B 9.5.
+  {
+    date: "2026-07-10",
+    title: "No landing, no cut, no hike, no sweep, no bears",
+    bb: 9.5, pcRatio: 0.55, skew: 144.27, vix: 15.03, emOutflow4wk: 0.3, cashLevel: 4.1,
+    flows: {
+      em: 0.5, em_total: 0.5, china_stocks: 1.4, em_china: 1.4, em_brazil: -0.6, em_india: -0.3,
+      hk: null, thailand: null,
+      global_stocks: 56.4, japan_stocks: 1.2, europe_stocks: -0.4,
+      sox: null, ustech: null,
+      gold: 0.3, precious_metals: 0.3, bonds: 2.0, crypto: 0.5, ig_bonds: 16.0,
+      us_largecap: 9.2, us_value: -0.2, us_smallcap: 3.3, us_growth: -1.2,
+      sec_tech: 18.8, sec_comsvs: 0.6, sec_financials: 2.4, sec_hcare: 1.5,
+      sec_utilities: 0.4, sec_consumer: 0.1, sec_realestate: 0.5,
+      sec_energy: 0.1, sec_materials: 1.7,
+    },
+    // Hull wk13 (spliced Sun 7/12 from Sat pipeline run, Fri 7/10 close final):
+    // MODEL-SEEDED PROXY, estFlagged. FLIP: XLE green->red (-0.15, inside noise band).
+    // NEAR FLIP (|m|<0.30): HYG +0.05, LQD -0.05, XLU +0.15, XLE -0.15, XLY -0.18.
+    // Broad deceleration: SOXX +6.96->+6.32, XLK 3.67->3.40, EEM 1.84->1.61 while
+    // SPY printed a record close 754.95 — internals slowing under a new high.
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "red", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "green", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "green", sec_realestate: "green", sec_energy: "red",
+      sec_materials: "green", sec_consumer: "red",
+    },
+    estFlags: { hullSignals: "model-seeded HMA(55) weekly proxy — not a user chart read" },
+    srcNotes: {
+      bb: "Flow Show 7/9/26: 'stays at 9.5'; breadth component weakened to 52%ile, offset by flows/spreads",
+      cashLevel: "Table 5 FMS Cash Indicator 4.1%, same edition",
+      emOutflow4wk: "Table 5 EM Flow Trading Rule -0.3% (4wk %AUM), stored as outflow magnitude per convention",
+      vix: "pipeline vol_indices 15.03 close 2026-07-10 (final; Sat run, commit 'prices 2026-07-11')",
+      hull: "HMA(55) wkly, 70 W-FRI bars ending 7/10; history from 7/6 pipeline snapshot + 7/10 row from Sat run — minor adjusted-close drift possible on ex-div names, near-flips chart-verify regardless",
+      pcRatio: "YCharts cboe_equity_put_call_ratio (EQUITY) 0.55 for Jul 10 2026 — passes <0.85 gate; MacroMicro 0.64 @6/30 path-consistent",
+      skew: "144.27 close Jul 10 — FXEmpire (timestamped 21:00 UTC) + Investing.com cross-confirmed; down from 150.02 wk12",
+      flows_pct: "em/china/brazil/india = Table 4 Wk %AUM; china +1.4%AUM = +$9.0bn biggest since Dec'25",
+      flows_conflict: "p.7 'Equities: $56.4bn outflow' contradicts headline+Table 3 (+$56.4bn IN, 4th largest YTD; $62.1bn ETF in, $5.8bn MF out) — treated as edition typo, inflow used, logged verbatim",
+    },
+  },
+  // ── Week 14: Jul 17 ── "Fade Runner" (Flow Show 17 Jul, wk ended
+  // 7/15 EPFR). Spliced Sun 7/19. REGIME: B&B 9.4->9.6 per edition (see bb srcNote
+  // conflict), FMS cash 3.6% = Cash Rule fires -> THREE contrarian sells stacked
+  // (B&B >=8.5 + Flow Rule + Cash Rule). $119.6bn OUT of cash (biggest since
+  // Apr'26) into $55.8bn stocks = capitulation out of safety. EM +$25bn biggest
+  // since Apr'25; China wk2 positive (+2.4% AUM) but MCHI Hull still red.
+  // MAGS levels this edition: <$65 retreat / >$70 reload ('>$71 = new highs').
+  {
+    date: "2026-07-17",
+    title: "Fade Runner",
+    bb: 9.6, pcRatio: 0.73, skew: 147.28, vix: 18.77, emOutflow4wk: null, cashLevel: 3.6,
+    flows: {
+      em: 0.8, em_total: 0.8, china_stocks: 2.4, em_china: 2.4, em_brazil: -1.7, em_india: -0.2,
+      hk: null, thailand: null,
+      global_stocks: 55.8, japan_stocks: 1.9, europe_stocks: 0.7,
+      sox: null, ustech: null,
+      gold: 0.5, precious_metals: 0.5, bonds: 20.0, crypto: -0.1, ig_bonds: 9.5,
+      us_largecap: 14.9, us_value: 0.3, us_smallcap: -0.8, us_growth: -5.3,
+      sec_tech: 15.6, sec_comsvs: 0.1, sec_financials: 2.7, sec_hcare: 0.7,
+      sec_utilities: 0.3, sec_consumer: -1.1, sec_realestate: -0.5,
+      sec_energy: 0.6, sec_materials: 0.5,
+    },
+    // Hull wk14: CARRIED from committed WEEKLY_LOG wk12-14 (state doc on disk,
+    // pipeline-computed 7/17 close in prior session): "no flips vs wk13".
+    // Pipeline unreachable this session — colors below = wk13 colors verbatim,
+    // MUST be re-verified against pipeline on next successful fetch.
+    // NEAR FLIP per log (|m|<0.30): INDA -0.29, HYG +0.05, LQD -0.10, XLU +0.15,
+    // XLE -0.21, XLB +0.20, XLY -0.17 — chart-verify before any entry decision.
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "red", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "green", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "green", sec_realestate: "green", sec_energy: "red",
+      sec_materials: "green", sec_consumer: "red",
+    },
+    estFlags: { hullSignals: "carried from WEEKLY_LOG wk12-14 ('no flips'), not a fresh pipeline compute — re-verify next fetch" },
+    srcNotes: {
+      bb: "Flow Show 7/17/26: 'up from 9.4 to 9.6' — CONFLICT: our wk13 seed has 9.5 sourced from the 7/9 edition ('stays at 9.5'); this edition backfills 9.4. Both editions verbatim; seed keeps each week's own edition. 'Sell signal remains in place.'",
+      cashLevel: "'plunge in institutional cash levels (3.6% in July FMS)' — FMS Cash Rule <4.0 FIRES: third stacked contrarian sell",
+      emOutflow4wk: "EM Flow Trading Rule 4wk %AUM table not present in uploaded edition — null per sourced-or-null (Table 2 weekly EM +0.8% AUM stored in flows.em)",
+      vix: "^VIX 18.77 close 7/17 — Yahoo + CNBC cross-confirm; matches pipeline vol_indices 18.77 in IV registry (independent-path check ✓)",
+      skew: "^SKEW 147.28 close 7/17 — FXEmpire timestamped 21:00 UTC; consistent with WEEKLY_LOG 147",
+      pcRatio: "YCharts cboe_equity_put_call_ratio (EQUITY) 0.73 for Jul 17 2026 — passes <0.85 gate; identity x-check: YCharts 0.57@7/09 == thetrading.tools 0.57@7/09; MacroMicro 1640 0.62@7/14 path-consistent (puts bid into Fri chip rout, VIX +12%)",
+      flows_pct: "em/china/brazil/india = Table 2 Wk %AUM; China +2.4%AUM = 2nd consecutive positive week (wk13 +1.4%), EM total +$25.0bn biggest since Apr'25",
+      flows_notable: "cash -$119.6bn biggest outflow since Apr'26; tech +$15.6bn = record 3wk $48.8bn; financials +$2.7bn biggest since Jan'26; IG +$9.5bn 15th wk; HY outflow resumes -$0.3bn",
+      sox_note: "semis: +$2.3bn to 8 largest semi ETFs (YTD $46bn = 31% AUM) — ETF subset, not EPFR category; sox stays null. SOX 33% above 200dma vs 76% Jun 3; SOX -20%/SOXL -55% from peak, no positioning unwind",
+      japan_phrasing: "'Japan: inflows past 6 weeks ($1.9bn)' — $ figure read as weekly per prior-splice convention; phrasing ambiguous (6th straight week)",
+      hull: "WEEKLY_LOG wk12-14 carry. PROVENANCE FLAG (7/26): the restored pipeline has NO equity rows for 2026-07-10..07-24 in its rebuilt history, so these wk14 colors cannot be re-derived — treat as unverified carry, not sourced values.",
+    },
+  },
+  // ── Week 15: Jul 24 ── "Bonds bringing the heat" (edition 23 Jul,
+  // EPFR wk ended 7/22). Spliced Sun 7/26. REGIME: B&B stays 9.6; SELL STACK
+  // RECOMPOSED — Global Flow Rule OFF (0.7% neutral), EM FLOW RULE ON (2.2% > 1.5
+  // sell trigger): the EM/China burst itself is now a Hartnett fade signal.
+  // China +$21.3bn 3rd biggest EVER (+3.1% AUM, wk3 of positive flows CONFIRMED);
+  // EM +$29.6bn 2nd biggest ever. US outflows resume -$7.2bn, ALL styles negative
+  // = rotation out of US into EM in one tape. 30Y 5.2% (highest since Jun'07),
+  // 38% implied July-29 hike / fully priced Sep 16. MAGS "struggling to hold
+  // 200dma ($65)" per Hartnett (closed 63.23 Thu). Blue-collar semis -21% from
+  // June peak = industrial-cycle lead rolling over.
+  {
+    date: "2026-07-24",
+    title: "Bonds bringing the heat",
+    bb: 9.6, pcRatio: null, skew: null, vix: 18.58, emOutflow4wk: -2.2, cashLevel: 3.6,
+    flows: {
+      em: 1.0, em_total: 1.0, china_stocks: 3.1, em_china: 3.1, em_brazil: 1.7, em_india: 0.0,
+      hk: null, thailand: null,
+      global_stocks: 30.4, japan_stocks: 1.5, europe_stocks: -1.6,
+      sox: null, ustech: null,
+      gold: 2.0, precious_metals: 2.0, bonds: 14.9, crypto: 0.9, ig_bonds: 5.9,
+      us_largecap: -0.1, us_value: -2.8, us_smallcap: -2.2, us_growth: -4.4,
+      sec_tech: 4.0, sec_comsvs: -0.5, sec_financials: 1.4, sec_hcare: 0.8,
+      sec_utilities: 0.2, sec_consumer: -0.3, sec_realestate: -0.5,
+      sec_energy: 0.2, sec_materials: 2.0,
+    },
+    // Hull wk15: NULL — pipeline unreachable from this session AND no committed
+    // handoff row exists for 2026-07-24 (WEEKLY_LOG ends at wk14). Per null-Hull
+    // semantics: no signal generation from hull-dependent branches this week;
+    // verdicts degrade to flow/regime-only. BACKFILL: paste bottom rows of
+    // weekly_closes.csv or send raw URL once.
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "red", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "green", sec_realestate: "green", sec_energy: "red",
+      sec_materials: "red", sec_consumer: "red",
+    },
+    estFlags: {},
+    // Display/context ONLY — computeSignal does not read this. Each print keeps
+    // its own as-of date because all predate this row's week-ending date (7/24).
+    volAux: {
+      skew: { value: 150.19, asOf: "2026-07-22", src: "Yahoo ^SKEW close = MacroMicro series 4407 = 150.19 @7/22 (two independent paths agree); YCharts reaches only 7/23; no free source has the 7/24 print at splice time" },
+      pcRatioEquity: { value: 0.61, asOf: "2026-07-23", src: "YCharts cboe_equity_put_call_ratio — EQUITY (single-stock) series, same series as the 0.73 stored for wk14" },
+      pcRatioSpx: { value: 1.17, asOf: "2026-07-24", src: "YCharts cboe_spx_put_call_ratio — INDEX options. Date matches this row, SERIES DOES NOT. Context only; must never be written into pcRatio (Protocol B.1 equity-vs-total trap)" },
+      note: "Backfill skew/pcRatio into the rule-facing fields only when the 7/24 print for the correct series appears.",
+    },
+    srcNotes: {
+      bb: "stays 9.6. NEW base-rate detail: sell signal live since May'26; 17 sell signals since '02, avg ACWI loss 2-3% over 2-3mo, hit ~60%, max DD 15-20%. 'Old' B&B 7.1. Components: HF 82%, EqFlow 96%, BondFlow 79%, Credit 79%, Breadth 50%, FMS 100%",
+      rules_shift: "SELL STACK RECOMPOSED — Global Flow Trading Rule 0.7% NEUTRAL (deactivated from SELL); BofA EM Flow Trading Rule 2.2% SELL (trigger >1.5% AUM inflows/4wk, duration 8wk). Stack x3 = B&B + FMS Cash + EM Flow: now EM-centric",
+      emOutflow4wk: "-2.2 = EM Flow Trading Rule 2.2% INFLOW 4wk %AUM stored negative per outflow-sign convention — fires SELL leg",
+      vix: "^VIX 18.58 close 7/24 (Yahoo 'At close' + FinLore x-confirm); Thu spike 19.53 faded Fri; day range 17.41-19.05",
+      skew: "null — latest confirmed print 150.19 @7/22 (Yahoo cache); 7/24 obs not sourced this session, backfill",
+      pcRatio: "null — YCharts lag pattern (wk14 filled T+3); backfill",
+      flows_pct: "em/china/brazil/india = Table 3 Wk %AUM (China 3.1% = wk3 CONFIRMED after +1.4, +2.4); China $21.3bn = 3rd biggest weekly inflow ON RECORD; EM $29.6bn = 2nd biggest ever; Korea record $16.3bn/4wk",
+      flows_notable: "US outflows RESUME -$7.2bn with ALL four styles negative (lc -0.1, sc -2.2, val -2.8, gr -4.4) while EM takes 2nd-biggest-ever = one-tape rotation. Crypto +$0.9bn biggest in 11wk; gold +$2.0bn biggest since Apr'26; tech record $52.8bn/4wk; financials biggest 4wk since Jan'22 ($8.8bn); UK -$1.2bn biggest since Nov'25; cash -$33.9bn",
+      zeitgeist: "'Smarter politically for Fed to hike next week, not wait until September, no?' — 38% implied July-29 hike, FULLY PRICED by Sep 16 FOMC; 30Y 5.2% highest since Jun'07, 30Y REAL 3% since Nov'08; US tech bond prices 2-yr lows; FCI > EPS; 'no forward guidance Warsh' hikes feared by bonds; 23 CB hikes in '26, BofA sees 18 more",
+      tale: "Blue-collar semis (TXN/ADI/NXP/MCHP/ON/STM/IFX/MPWR) -21% from June peak = industrial-cycle lead indicator; MAGS struggling to hold 200dma $65; 'up in yields, up in banks' combo flipping to 'higher yields = lower banks' = risk-deleveraging trigger; Hartnett trades: LONG defensives/dividends/duration, SHORT banks/brokers/tech/industrials (most overweight since Jul'21)",
+      hull: "data/hull_weekly.csv asof 2026-07-24 VERBATIM (pipeline v1.1: idempotent rebuild, validate-then-write, coverage 100%, Friday week-end labels). Engine calibrated 2026-07-03: reproduced all 28 seed colors exactly. FLIPS vs that baseline: HYG green->RED, XLB green->RED; all others unchanged. Near-flips requiring CHART-VERIFY (hysteresis): em_india(INDA) -0.13; thailand(THD) +0.27; bonds(HYG) -0.06; ig_bonds(LQD) -0.16; japan_stocks(EWJ) +0.29; europe_stocks(VGK) +0.09; us_growth(IWF) +0.23; sec_utilities(XLU) +0.06; sec_energy(XLE) -0.05; sec_materials(XLB) -0.03; sec_consumer(XLY) -0.23.",
+      biggest_picture: "Hartnett SECULAR BULL Hong Kong property — same price as 30 years ago, 'secular buyers of any dips caused by Fed tightening or BoJ currency crisis'; secular rise in China/Asia tech; yen weakest vs USD since 1986; 2020s supply-constrained regime; 'why gold & bitcoin BASING in 26'",
+    },
+  },
+  // ── Week 16: Jul 31 ── "Credibility, Intervention & Liquidation"
+  {
+    date: "2026-07-31",
+    title: "Credibility, Intervention & Liquidation",
+    bb: 9.4, pcRatio: null, skew: 141.23, vix: 15.99, emOutflow4wk: null, cashLevel: 3.6,
+    flows: {
+      em: 1.0, em_total: 1.0, china_stocks: 3.1, em_china: 3.1, em_brazil: 1.7, em_india: 0.0,
+      hk: null, thailand: null,
+      global_stocks: 63.7, japan_stocks: 1.2, europe_stocks: -2.3,
+      sox: null, ustech: null,
+      gold: 1.3, precious_metals: 1.3, bonds: 12.5, crypto: -0.4, ig_bonds: 5.8,
+      us_largecap: 20.6, us_value: 1.1, us_smallcap: -0.6, us_growth: -1.9,
+      sec_tech: 15.7, sec_comsvs: -0.2, sec_financials: 0.4, sec_hcare: 1.1,
+      sec_utilities: 0.1, sec_consumer: 0.6, sec_realestate: 0.004,
+      sec_energy: -0.5, sec_materials: -0.011,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "red", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "red", sec_consumer: "red",
+    },
+    estFlags: {},
+    srcNotes: {
+      bb: "9.6 -> 9.4, FIRST DECLINE since sell signal triggered 2026-05-26. Verbatim driver: 'down to 9.4 from 9.6 on EM debt outflows'. Still >8.0 = SELL intact. Components: HF 81, EqFlow 98, BondFlow 66, Credit 75, Breadth 49 neutral, FMS 100. Old B&B 7.4",
+      emOutflow4wk: "NULL - Rules & Tools table absent from this edition. EM Flow Rule status CARRIED from wk15 (2.2% SELL, week 2 of 8) and explicitly NOT re-derived from China flow. Per rev1.3 the asset-scoped suspension stays until the printed 4wk %AUM retreats below 1.5%",
+      flows_pct: "em/china/brazil/india = Table 2 Wk %AUM. China +$15.9bn = LARGEST 4-WEEK INFLOW EVER ($62.4bn cumulative), 4th consecutive positive week",
+      flows_notable: "global equities +$63.7bn 'fearless buy-the-dip continues'; US +$30.4bn largest in 6wk (large cap +$20.6bn); tech +$15.7bn largest 5wk ever $68.5bn; semi ETFs +$5.3bn with SOX -25% = NO positioning unwind ($53bn YTD); IG 17th week; Korea +$1.6bn slowing but no outflow day; consumer +$0.6bn largest in 9wk",
+      vix: "^VIX 15.99 close 7/31, -22.6% from 20.66 on 7/29. Market V-recovered: S&P 7489.72 +1.05% w/w, MAGS 65.77 back ABOVE the $65 tripwire",
+      skew: "141.23 @2026-07-31 from data/vol_indices.csv (pipeline v1.4, Yahoo ^SKEW). 19.5%ile of its own 52wk range 132.31-161.86. Down from 150.19 @7/22 = tail-hedge demand released after FOMC passed",
+      hull: "data/hull_weekly.csv asof 2026-07-31 VERBATIM via run log (CDN cache was serving the 7/24 body). FLIPS vs 7/24: XLE red->GREEN, XLU green->RED. MCHI improved -0.89 -> -0.66 but still red and no longer near-flip-adjacent. Near-flips requiring CHART-VERIFY: em(EEM) +0.17; em_total(EEM) +0.17; em_india(INDA) -0.05; thailand(THD) +0.24; bonds(HYG) -0.06; ig_bonds(LQD) -0.19; japan_stocks(EWJ) +0.23; europe_stocks(VGK) +0.13; us_growth(IWF) +0.17; sec_utilities(XLU) -0.03; sec_energy(XLE) +0.04; sec_materials(XLB) -0.12; sec_consumer(XLY) -0.19",
+      pcRatio: "null - Cboe mirrors still lag; volAux carries equity 0.61 @7/23",
+      rotation_scorecard: "Since the 5/26 sell signal VERBATIM: healthcare +9%, banks +8%, ACWI -3%, MAGS -8%, SOX -11%, oil -11%, bitcoin -15%. Rotation delivered; outright retreat did not",
+      thesis: "'credibility event...Fed nakedly dovish, so financial conditions to continue to tighten until Fed forced to restore credibility via aggressive hikes (= higher yields into Warsh at Jackson Hole Aug 28th)'. IMPORTANT SHIFT vs wk15: the U-turn trigger is now a 'higher yields-LOWER dollar' vigilante event (Chart 5: 30Y-vs-USD 50d correlation turning negative Jul'26) - this cuts against the long-USD hedge that wk14/15 endorsed",
+      intervention: "US/Japan/Korea COORDINATED FX intervention = most important event of week; framed as 'AI PKO' (price keeping operations) to stop JPY collapse -> JGB melt-up -> Korea/Taiwan bond contagion. Policymakers capping yields instead of monetary shock therapy = 'why MAGS cannot break out to new highs'",
+      liquidation: "KOSDAQ at Oct'22 lows; Mirae (largest Korea broker) -66% at Jul'07 levels; US retail darlings below VWAP entry. 'no big rally on lovey-dovey Fed + AI PKOs + liquidation...risk assets capped into midterms'",
+      portfolio_call: "retreat from risk assets and/or rotate into defensives (staples), DURATION (REITs, small cap, biotech) and US dollar",
+      private_clients: "$4.5tn AUM, 65.5% stocks, 17.5% bonds, cash 9.7% (up from the 9.6% record low). Past 4wk buying munis/Japan/EM debt, SELLING low-vol, bank loan, PRECIOUS METAL ETFs",
+    },
+  },
+  // ── Week 17: Aug 7 ── "Poor man's LTCM, rich man's YCC"
+  // Edition 6 Aug 2026 · EPFR week ended 8/5 · row labeled Fri 2026-08-07.
+  {
+    date: "2026-08-07",
+    title: "Poor man's LTCM, rich man's YCC",
+    bb: 9.7, pcRatio: null, skew: 132.57, vix: 14.9, emOutflow4wk: null, cashLevel: 3.6,
+    flows: {
+      em: 0.3, em_total: 0.3, china_stocks: -0.4, em_china: -0.4, em_brazil: 0.2, em_india: -0.2,
+      hk: null, thailand: null,
+      global_stocks: 32.9, japan_stocks: 2.6, europe_stocks: 0.055,
+      sox: -2.4, ustech: null,
+      gold: 0.9, precious_metals: 0.9, bonds: 23.1, crypto: 0.6, ig_bonds: 10.2,
+      us_largecap: 11.1, us_value: -2.8, us_smallcap: -0.2, us_growth: -0.6,
+      sec_tech: -0.7, sec_comsvs: -0.9, sec_financials: -0.1, sec_hcare: 0.4,
+      sec_utilities: 0.1, sec_consumer: 0.6, sec_realestate: 0.024,
+      sec_energy: -0.1, sec_materials: 0.7,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "green", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "red", sec_consumer: "red",
+    },
+    estFlags: {},
+    // Display/context ONLY — computeSignal does not read volAux.
+    volAux: {
+      gvz: { value: 25.64, asOf: "2026-08-07", src: "board.json vol_indices — GOLD vol at 54.4%ile of its own 52wk range while GLD Hull sits -1.42 red. Context for the gold conflict, not a rule input" },
+      vxn: { value: 22.82, asOf: "2026-08-07", src: "board.json vol_indices — NDX vol 45.6%ile vs VIX 8.7%ile: index-level calm, tech-level not" },
+      vvix: { value: 90.42, asOf: "2026-08-07", src: "board.json vol_indices — 13.1%ile" },
+      ovx: { value: 55.8, asOf: "2026-08-07", src: "board.json vol_indices — 61.5%ile; oil +34.6% YTD is the top asset class on Scores on the Doors" },
+      note: "VXEEM / VXFXI / VXHYG / RVX remain null — Yahoo does not serve them. EM and China therefore have NO implied-vol read at all this week.",
+    },
+    srcNotes: {
+      bb: "9.4 -> 9.7, HIGHEST SINCE 2021 and the first RISE since the sell signal triggered 2026-05-26. Verbatim drivers: 'strong HY inflows, tighter global HY and AT1 risky bond spreads, and stronger global stock index breadth'. Components printed: HF Positioning 80%, Equity Flow 97%, Bond Flow 74%, Credit Market Technicals 77%, Global Stock Index Breadth 61% NEUTRAL, FMS Positioning 99%. 'Old' B&B 7.8 (from 7.4). NOTE the reflexivity: the flows this tracker counts as entry evidence are the same flows pushing B&B to a 5-year high",
+      emOutflow4wk: "NULL for the THIRD consecutive edition — Rules & Tools table absent from 31 Jul and 6 Aug. EM Flow Rule status CARRIED from wk15 (2.2% SELL, now week 3 of 8, expires ~17 Sep). NOT re-derived from Table 3. WARNING: EM Wk %AUM has decayed 1.0 -> 1.0 -> 0.3 and China turned -0.4, so the live 4wk figure may already be below the 1.5% trigger — but 'may' is not a source. The asset-scoped suspension stands until BofA prints a number below 1.5%",
+      cashLevel: "3.6% CARRIED — Global FMS is MONTHLY and the August survey is not out (~18 Aug). This is still the live print, not a stale guess. DO NOT confuse with BofA Private Client cash 9.6% in this same edition: different survey, different population, different threshold. That substitution is the same series-identity error class as the equity-vs-total put/call trap",
+      flows_pct: "em/china/brazil/india = Table 3 Wk %AUM. CHINA -0.4 = FIRST NEGATIVE WEEK after the record 4-week run ($62.4bn cumulative through 7/31). India -0.2 also negative. Total EM +0.3 still positive but decaying. The Wk %AUM column MOVED this week after printing identical values on 23 and 31 Jul — confirms that repeat was a BofA-side artifact",
+      flows_notable: "Headline weekly: $53.7bn to CASH (largest destination by far), $32.9bn stocks ($40.1bn ETFs vs -$7.2bn mutual funds), $23.1bn bonds, $0.9bn gold, $0.6bn crypto. EM equities +$8.6bn BUT annualizing -$55bn outflow YTD, worst since '15. Tech -$0.7bn = 1st outflow in 6 weeks (still annualizing record $217bn). Semi ETFs -$2.4bn = 1st in 6 weeks. Infrastructure -$0.3bn biggest since Mar'25. IG bonds +$10.2bn, 18th straight week, annualizing record $527bn. HY +$4.1bn biggest since Jul'24. Bank loans +$1.4bn, 8th week, best year since '21. Bonds now 67 consecutive weeks of inflows",
+      flows_style_sector: "By style: US large cap +$11.1bn; OUTFLOWS small cap -$0.2bn, growth -$0.6bn, value -$2.8bn. Note the conflict: Hartnett recommends SMALL CAP as a duration play while small cap posts its 3rd straight weekly outflow. By sector inflows: materials +0.7, consumer +0.6, hcare +0.4, utils +0.1, real estate +0.024. Outflows: com svs -0.9, tech -0.7, financials -0.1, energy -0.1",
+      vix: "^VIX 14.9 close 2026-08-07 from board.json vol_indices — 8.7%ile of its own 52wk range, i.e. near the calm extreme, with B&B at a 5-year high. Complacency and crowding reading the same tape",
+      skew: "132.57 @2026-08-07 from Cboe SKEW_History.csv via pipeline (Yahoo ^SKEW was the feed that froze; Cboe is now primary). 1.2%ile of its 52wk range — tail hedges are being SOLD, not bought, down from 141.23 @7/31 and 150.19 @7/22",
+      pcRatio: "null — Cboe equity put/call still unsourced. The URL previously used was an ARCHIVE file serving a 2019-10-04 body; MAX_SOURCE_AGE_DAYS caught it (age 2501d, status STALE_2501d_source_is_archive in board.json). Correct behaviour: stays null until a live file is verified by actual fetch",
+      hull: "board.json asof 2026-08-07 VERBATIM (generated 2026-08-09T07:08Z, coverage 1.0, rows 157, 32 tickers). EXACTLY ONE FLIP vs 7/31: em_india(INDA) red -> GREEN at +0.05. That is a razor-thin cross inside hysteresis — CHART-VERIFY before acting. Near-flips requiring CHART-VERIFY (|margin| < 0.30 weekly): em/em_total(EEM) +0.11; em_india(INDA) +0.05; thailand(THD) +0.23; bonds(HYG) -0.06; ig_bonds(LQD) -0.21; europe_stocks(VGK) +0.23; us_growth(IWF) +0.27; sec_utilities(XLU) -0.15; sec_energy(XLE) +0.02; sec_materials(XLB) -0.07; sec_consumer(XLY) -0.05. 3D-vs-weekly DISAGREE on 6 of 32 (EEM, MCHI, EWH, SOXX, XLB, XLY) — parallel-validation week 3 of 4, agreement 26/32 = 81%",
+      universe_gap: "Pipeline is still running 32 tickers, NOT 39 — build_weekly.py 868 is not committed. XLP staples, XLI industrials, XBI biotech, UUP dollar, TLT duration, VYM dividends, IAI brokers therefore have NO Hull. Five of the seven themes Hartnett names this week fall in that gap, so his LONG list cannot be cross-checked against price",
+      tactics: "'we remain in summer Retreat/Rotate not Reload camp; we recommend investors retreat from risk assets and/or rotate into some defensives (e.g. staples), duration (e.g. REITs, small cap, biotech) and US dollar, all protected from ongoing tightening of financial conditions, less cyclically vulnerable than banks, industrials, semis to bull consensus \"no macro landing, no Fed hike, no AI capex cut, no DEM midterm sweep\" disappointment'",
+      strategy: "Asset allocation remains 'long stocks, short bonds' — policymakers treat equities as 'too big to fail'; household equity holdings +$7tn YTD after $9tn of gains in '25-'26. The bull ends on a 'higher yields-lower dollar' vigilante event forcing a fiscal U-turn. 'Up-in-yields, down-in-banks' is the named canary. Note this is the SAME dollar-direction tension flagged at wk16: he is long USD tactically while his end-game requires a LOWER dollar",
+      triggers: "Datable and checkable: MAGS > $70 needed to kill the cheap-China-compute threat to AI capex. July payrolls NFP > 125k with U-rate < 4.1% = Warsh flips back to 'I'm a hawk' at Jackson Hole 28 Aug; NFP < 50k with U-rate > 4.3% = contrarian duration and defensives bullish. Thresholds policymakers will not tolerate: $4 gasoline, 160 USD/JPY, 5% UST — 'thou shalt not pass', YCC card available",
+      gold_call: "'we long gold to hedge a K-shape electorate delivering \"it's the economy, stupid\" midterms verdict triggering a big down in yields/dollar/stocks into year-end.' Precious metals now 5 consecutive weeks of inflows (+$0.9bn). AGAINST THIS: gold is -2.3% YTD, the worst major asset class on Scores on the Doors except bitcoin, and GLD Hull weekly is -1.42 with GLTR at -1.97 — neither near a flip. Flow and opinion agree; price does not. F3 correctly withheld",
+      tape: "Scores on the Doors YTD: oil +34.6%, international stocks +14.4%, US stocks +12.6%, HY +2.2%, cash +2.2%, US$ +1.7%, IG 0.0%, govt bonds -1.0%, gold -2.3%, bitcoin -26.5%. Past week saw COORDINATED FX INTERVENTION ending a fund deleveraging event — 'poor man's LTCM' — read by Hartnett as confirmation the US admin will always block tighter financial conditions. EPS optimism soaring, 12m forward estimates +33%, helped by a $35bn tariff refund reversing the $75bn May-Jul'25 EPS hit. CAUTION: that +33% is S&P 500 12m fwd EPS y/y — it is NOT the Global EPS Growth Model, which last printed 9% at wk15. Do not substitute one for the other",
+      private_clients: "$4.5tn AUM, 65.7% stocks, 17.4% bonds, cash 9.6% (back down to the record low from 9.7%). Back into T-BILLS (biggest inflow since Apr'26) and out of T-notes. Equity ETF share count +6.4% YTD, +0.7% past 4wk, +0.2% past week. Past 4wk ETF buying: munis, Japan, STAPLES; selling low-vol, utilities, EM debt. Note they are now buying the staples Hartnett recommends and selling the utilities he does not",
+    },
+  },
+  // ── Week 18: Aug 14 ── "Strife Begins at Forty"
+  // Edition 13 Aug 2026 · EPFR week ended 8/12 · row labeled Fri 2026-08-14.
+  {
+    date: "2026-08-14",
+    title: "Strife Begins at Forty",
+    bb: 9.3, pcRatio: null, skew: 138.36, vix: 14.25, emOutflow4wk: null, cashLevel: 3.6,
+    flows: {
+      em: -0.4, em_total: -0.4, china_stocks: -2.1, em_china: -2.1, em_brazil: -2.1, em_india: -0.1,
+      hk: null, thailand: null,
+      global_stocks: 16.1, japan_stocks: 0.2, europe_stocks: 1.2,
+      sox: null, ustech: null,
+      gold: 6.3, precious_metals: 6.3, bonds: 23.8, crypto: 0.3, ig_bonds: 10.6,
+      us_largecap: 17.7, us_value: 1.1, us_smallcap: 0.8, us_growth: -4.3,
+      sec_tech: -1.2, sec_comsvs: -0.8, sec_financials: -0.7, sec_hcare: -1.0,
+      sec_utilities: -0.1, sec_consumer: -0.6, sec_realestate: -0.1,
+      sec_energy: 0.1, sec_materials: 2.5,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "green", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red", crypto: "red",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "red", sec_consumer: "green",
+    },
+    estFlags: {},
+    // Display/context ONLY — computeSignal does not read volAux.
+    volAux: {
+      gvz: { value: 23.92, asOf: "2026-08-14", src: "board.json vol_indices — gold vol 34.9%ile, DOWN from 25.64/54.4%ile at wk17 even as gold takes its biggest inflow since Jan'26. Rising flow with falling vol is accumulation, not panic" },
+      vxn: { value: 20.72, asOf: "2026-08-14", src: "board.json vol_indices — NDX vol 29.4%ile (was 45.6%ile). Tech vol compressed in the same week tech posted its biggest outflow in 7 weeks" },
+      vvix: { value: 87.48, asOf: "2026-08-14", src: "board.json vol_indices — 5.6%ile" },
+      ovx: { value: 49.52, asOf: "2026-08-14", src: "board.json vol_indices — 53.2%ile. Commodities +58.9% and oil +43.0% YTD are the top two asset classes on Scores on the Doors" },
+      note: "VXEEM / VXFXI / VXHYG / RVX null (Yahoo does not serve). VXEWZ 29.32 and VXEFA 16.58 are STALE at asof 2026-07-17 — present but 28 days old, NOT null. Brazil therefore has no current IV read going into the Oct 4 election.",
+    },
+    srcNotes: {
+      bb: "9.7 -> 9.3, the FIRST DECLINE since the 5-year high. Still above the 8.0 sell threshold so the signal STANDS. Verbatim drivers: weaker flows to HY bonds, outflows from tech & healthcare. Components printed: HF Positioning 80% Bullish, Equity Flow 90% V.Bullish, Bond Flow 72% Bullish, Credit Market Technicals 78% Bullish, Global Stock Index Breadth 61% NEUTRAL, FMS Positioning 99% V.Bullish. 'Old' B&B unchanged at 7.8. Hartnett's own scorecard on the signal, verbatim: since inception 17 sell signals, average loss for global stocks 2-3% over 2-3 months, hit ratio ~60%, max drawdowns 15-20%; since the May 26th sell signal SPX is UP 4% and ACWI UP 3%, albeit with a -5% drawdown from May 26 to Jul 30 that was stopped by US/Japan FX intervention and Mag7 EPS. He adds the caveat that ending a bull market needs excess positioning AND excess profit optimism AND policy tightening — he only has the first",
+      emOutflow4wk: "NULL for the FOURTH consecutive edition — Rules & Tools table absent from 31 Jul, 6 Aug and 13 Aug. EM Flow Rule status CARRIED from wk15 (2.2% SELL, week 4 of 8, expires ~17 Sep). NOT re-derived from Table 2. The underlying picture has now moved HARD the other way: EM Wk %AUM 1.0 -> 1.0 -> 0.3 -> -0.4, EM equities post an $11.9bn outflow, China -2.1% and -$14.5bn. A live 4wk print would very likely no longer be a 1.5%+ INflow. But 'likely' is not a source — the suspension stands until BofA prints a number",
+      cashLevel: "3.6% CARRIED. Hartnett states the August FMS is released on the 18th — TWO DAYS after this splice. He also pre-registers what he will read from it: another drop from 3.6% plus FMS equity allocation surging from 42% OW to >52% would say TAKE PROFITS; a cooling of July's record conviction (54% 'no landing', 83% 'no Fed hike', 61% 'no AI capex cut', 27% 'no DEM sweep') would say KEEP ADDING. This is a datable, checkable trigger — see triggers",
+      flows_pct: "Table 2 Wk %AUM: Total EM -0.4 (was +0.3), China -2.1, Brazil -2.1, India -0.1, Total DM +0.1, US +0.1, Europe +0.1, Japan 0.0, International +0.1. BRAZIL AT -2.1% IS THE JOINT-WORST READING ON THE TABLE, tied with China, seven weeks before the Oct 4 election. YTD Brazil is still +$3,539mn, the only positive EM line (China -200,781, India -10,125, Total EM -44,925)",
+      flows_notable: "Headline weekly: $25.4bn to cash, $23.8bn bonds, $16.1bn stocks, $6.3bn GOLD, $0.3bn crypto. GOLD $6.3bn = BIGGEST INFLOW SINCE JAN'26, 6th straight week of precious-metal inflows. China equities -$14.5bn = biggest outflow since May'26. Europe +$1.2bn biggest since Feb'26. Korea +$2.0bn, 7th straight week. Tech -$1.2bn biggest outflow in 7 weeks. Materials +$2.5bn biggest since Mar'26. IG +$10.6bn biggest in 5 weeks (19th straight week). EM debt +$1.4bn biggest in 7 weeks. Bonds now 68 consecutive weeks of inflows. Equities $16.1bn = $22.8bn ETFs MINUS $6.8bn mutual funds",
+      flows_style_sector: "By style INFLOWS: US large cap +$17.7bn, US value +$1.1bn, US SMALL CAP +$0.8bn; OUTFLOW US growth -$4.3bn. Small cap turning positive matters — he names small cap in the ABB long list and the flow now agrees, unlike wk17 when small cap was in its 3rd straight outflow week. By sector INFLOWS: materials +2.5, energy +0.1. OUTFLOWS: real estate -0.1, utils -0.1, consumer -0.6, financials -0.7, com svs -0.8, healthcare -1.0, tech -1.2. NOTE REITs: he names REITs first in the ABB long list while real estate posts an outflow",
+      vix: "^VIX 14.25 close 2026-08-14 from board.json vol_indices — 2.8%ile of its own 52wk range, DOWN from 8.7%ile at wk17. Near the absolute calm extreme with B&B at 9.3. His own phrase for it: 'Wall St trades with no fear'",
+      skew: "138.36 @2026-08-14 from Cboe SKEW_History.csv via pipeline, 9.1%ile (up from 132.57/1.2%ile). Tail hedging picked up slightly off a record-low base but remains in the bottom decile",
+      pcRatio: "null — Cboe equity put/call still unsourced. board.json reports status STALE_2508d_source_is_archive (asof 2019-10-04). Stays null until a live file is verified by actual fetch",
+      hull: "board.json asof 2026-08-14 VERBATIM (generated 2026-08-16T06:53:32Z, coverage 1.0, rows 157, 39 TICKERS — build_weekly.py 868 is now committed and the 7 theme tickers backfilled with zero missing). EXACTLY ONE WEEKLY FLIP vs 8/07: sec_consumer(XLY) red -> GREEN at +0.04, razor-thin, CHART-VERIFY. Near-flips (|margin| < 0.30 weekly): EEM +0.13, MCHI -0.27, INDA +0.10, EWH -0.29, THD +0.19, HYG -0.05, LQD -0.22, BTCUSD -0.18, VGK +0.30, XLU -0.22, XLE +0.17, XLB -0.04, XLY +0.04, EFA +0.29, XLP -0.00, UUP +0.21. NOTE XLP at -0.00 prints RED while XLY at +0.04 prints GREEN — do not infer colour from sign alone. 3D disagrees with weekly on 6 of 39 (EEM, MCHI, THD, SOXX, XLB, XLP) = 85% agreement; parallel-validation flag still set, decision ~29 Aug. 3D flipped EWH and THD green -> RED this week; hullSignals stores WEEKLY colour only, so that is recorded here in notes, not in the field",
+      new_tickers: "First week with Hull for Hartnett's own themes. Against his LONG list: XBI +1.11 GREEN (strongest agreement on the board), XLRE +0.34 green, IWM +0.65 green, GLD -1.22 RED. Against names he has dropped or downplayed: XLP -0.00 RED, UUP +0.21 green, TLT -0.38 RED. Against what he called vulnerable at wk17: XLI +0.42 GREEN, IAI +0.62 green. KRE (regional banks, named in the ABB long list) is NOT in the universe — no Hull, cannot be cross-checked",
+      tactics: "NOT a stance change — this edition is simply organised around the four standing allocation regimes instead of a Tactics/Strategy block. Verbatim: 'asset allocation rules of the road in 2020s REMAIN ABB (Anything but Bonds), ABC (Anywhere but China), ABD (Anything but the US Dollar), AI (all-in on AI)'. Note 'remain' — these DESCRIBE where money has gone in the 2020s, they are not four recommendations. ABD means investors buy anything but the dollar; it is NOT an instruction to short USD. He then names the trade within each: On ABB 'long REITs/XBI/KRE/small cap'. On ABC 'long Hong Kong property sector' (fading the regime — he calls the END of Anywhere-But-China). On ABD 'long gold...still best hedge against dollar debasement, bond collapse, asset inflation'. On AI 'short AI bonds as >$1tn capex and negative net cash flow = big issuance; optimal bubble strategy remains long \"hubris\" (AI) & long \"humiliation\" (out-of-favor, distressed cyclical plays...we think most likely consumer, China next few quarters)'",
+      carried_calls: "TWO wk17 calls are NOT restated in wk18 and are therefore CARRIED, not withdrawn: (1) the tactical 'summer Retreat/Rotate not Reload / retreat from risk assets' posture, and (2) LONG US DOLLAR. Nothing in this edition contradicts either. Reading ABD as a reversal of the long-USD call is an inference, not a print — do not make it. UUP Hull weekly is +0.21 green, so the carried USD call and price currently agree",
+      risk_appetite: "The Price is Right, verbatim: 'loadsa EPS, $10tn wealth surge '26, >$1tn AI capex '27...door wide open for bulls to rip risk higher...only constraints are bonds (yield surge), voters (socialist surge), plus fact that all positioned for upside.' Read it whole: the bullish clause is a DESCRIPTION of the setup and it is immediately followed by three constraints, the third of which — everyone already positioned long — is a bearish caveat, not an endorsement. Same for 'why Wall St trades with no fear', which is critical in tone. An earlier draft of this note called it a one-week reversal of stance; that was an over-read and is retracted. B&B and FMS Cash both still print Sell",
+      debt: "The Biggest Picture: US national debt to surpass $40tn within days, on course for $50tn by '29. Debt service $1.4tn over the past 12 months and will KEEP RISING until 5Y UST yields drop below 3.25%. US stocks made new highs the same day the government sold 30-year USTs at 5.126%, the highest yield in 25 years",
+      china_call: "Hartnett calls the END of Anywhere-But-China: HK property at the same index level as 30 years ago (-70% from Apr'19), trading 12x earnings, 'buy humiliation, sell hubris'; Asia starting its 3rd secular bull market in 40 years; HK benefiting as Dubai and Singapore lose allure. ⚠️ FLOW AND OPINION NOW POINT OPPOSITE WAYS: China posted its biggest outflow since May'26 (-$14.5bn, -2.1% AUM) in the same week. MCHI Hull weekly is -0.27 RED (near-flip) and 3D is +0.13 green. All three layers disagree with each other",
+      brazil: "'Oct 4th Brazil election is key directionally as LatAm assets have been rewarded by election of more business-friendly governments...all seven presidential elections since Jan'25 have been won by right-wing/right-leaning candidates, and leftist Lula vs. right-wing Bolsonaro next big test.' Against this: Brazil Wk %AUM -2.1 (joint worst on the table) and EWZ Hull -0.71 weekly / -0.55 3D, both DETERIORATING from wk17 (-0.59 / -0.34). Opinion is constructive-conditional; flow and price are not",
+      triggers: "Datable and checkable. Aug 18: August FMS — cash below 3.6% + equity allocation >52% OW = 'take profits'; cooling of the record July conviction = 'keep adding'. Aug 28: Warsh at Jackson Hole. Sep 4: Aug payrolls. Sep 16: FOMC, HIKE probability 35%. Sep 18: BoJ, HIKE probability 74%. Sep 24: Trump-Xi summit. Oct 4: Brazil election. Oct 28: FOMC 6 days before midterms, HIKE probability 55%. Nov 3: US midterms. NOTE these are HIKE probabilities, not cuts. Hartnett flags that a hawkish Warsh plus a BoJ hike could signal 'Mission Accomplished' to cap yields and end yen collapse risk. Inflation path: headline CPI to 2.8-3.6% by midterms, core to 2.1-2.6%",
+      politics: "'should Trump hold Senate & Abbott hold Texas, expect stocks (esp. AI) to rip into bubbly '27; but should DEMs take Senate/TX Governor mansion on Nov 3rd, then big slump in stocks (>10%), US dollar, and bond yields into year-end.' Texas Governor race Abbott 48% vs Hinojosa 44% framed as a referendum on affordability vs AI data centres (335 in TX, 247 new proposals); Abbott's temporary pause on data-centre expansion is read as electoral unease",
+      private_clients: "$4.7tn AUM (from $4.5tn), 66.4% stocks = ALL-TIME HIGH, 17.0% bonds = lowest since Mar'22, 9.4% cash = LOWEST EVER. Largest weekly equity inflow since Sep'22. Within bonds they are EXTENDING DURATION: T-notes (2-10y) allocation +15% YTD vs T-bills (<1y) down >30% since Nov, with no interest in T-bonds. Equity ETF share count +6.6% YTD. Past 4wk ETF buying: Japan, muni bonds, TIPS; selling EM debt, utilities, FINANCIALS. NOTE the direction: private clients are rotating OUT of T-bills and INTO T-notes on a >30% swing. That is a crowd positioning itself, not a recommendation, and it carries the reinvestment risk that comes with giving up bill roll for note duration",
+      tape: "Scores on the Doors YTD: commodities +58.9%, oil +43.0%, ACWX +14.8%, SPX +13.9%, HY +2.3%, cash +2.2%, US$ +1.7%, GOLD +1.0%, IG -0.4%, govt bonds -1.5%, bitcoin -27.9%. GOLD HAS FLIPPED POSITIVE YTD (was -2.3% at wk17) in the same week as its biggest inflow since Jan'26. Zeitgeist quote: '$12.5bn for Lakers why bonds can't rally on no inflation and no jobs growth'",
+    },
+  },
+  // ── Week 19: Aug 21 ★ LATEST SEED ── "Steel Cage Match...Bessent vs ABB"
+  // Edition 20 Aug 2026 · EPFR week ended 8/19 · row labeled Fri 2026-08-21.
+  {
+    date: "2026-08-21",
+    title: "Steel Cage Match...Bessent vs ABB",
+    bb: 9.5, pcRatio: null, skew: 143.9, vix: 15.13, emOutflow4wk: null, cashLevel: 3.6,
+    flows: {
+      em: 0.0, em_total: 0.0, china_stocks: -0.1, em_china: -0.1,
+      em_brazil: -1.1, em_india: -0.4, hk: null, thailand: null,
+      global_stocks: 40.1, japan_stocks: -1.7, europe_stocks: 0.2,
+      sox: -0.7, ustech: null,
+      gold: 3.8, precious_metals: 3.9, bonds: 21.4, crypto: 1.0, ig_bonds: 7.5,
+      us_largecap: 33.0, us_value: -0.2, us_smallcap: 0.1, us_growth: -0.5,
+      sec_tech: 2.3, sec_comsvs: 0.076, sec_financials: -2.0, sec_hcare: -0.5,
+      sec_utilities: -0.2, sec_consumer: -0.5, sec_realestate: -0.1,
+      sec_energy: -0.022, sec_materials: 1.5,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "green", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "green", sec_consumer: "green",
+    },
+    estFlags: {},
+    volAux: {
+      gvz: { value: 27.29, asOf: "2026-08-21", src: "board.json — gold vol 34.9 -> 67.5%ile IN ONE WEEK. Gold IV is no longer cheap. If a gold entry was being timed on cheap vol, that window has closed even though flow stayed positive" },
+      vxn: { value: 21.98, asOf: "2026-08-21", src: "board.json — 36.5%ile, up from 29.4%" },
+      vvix: { value: 86.27, asOf: "2026-08-21", src: "board.json — 4.0%ile, still bottom decile" },
+      ovx: { value: 49.62, asOf: "2026-08-21", src: "board.json — 52.8%ile. Oil +53.0% YTD is far and away the top asset class" },
+      note: "VXEEM / VXFXI / VXHYG / RVX still null. VXEWZ 29.32 and VXEFA 16.58 STALE at 2026-07-17 — now 35 days old, six weeks before the Brazil election.",
+    },
+    srcNotes: {
+      bb: "9.3 -> 9.5. The wk18 decline did NOT continue — it reversed. Verbatim drivers: stronger global stock index breadth, bullish positioning in S&P500 AND GOLD FUTURES. BofA positioning data reads 'extreme bull'. Components: HF Positioning 83% V.Bullish, Equity Flow 93% V.Bullish, Bond Flow 70% NEUTRAL, Credit Market Technicals 77% Bullish, Global Stock Index Breadth 65% NEUTRAL, FMS Positioning 99% V.Bullish. 'Old' B&B 7.9 (from 7.8). ⚠️ HIS OWN SCORECARD GOT WORSE, NOT BETTER: he now prints SPX +1.6% since the 26 May sell signal (he said +4% last week), ACWI +1.3% (was +3%), HYG -0.8%, with a 4% SPX drawdown 2 Jun–29 Jul. Same signal, same start date, materially smaller numbers one week later — that is a restatement, not a market move. Treat the base rate as the durable figure and the week-to-week scorecard as noise",
+      emOutflow4wk: "NULL for the FIFTH consecutive edition. Rules & Tools absent from 31 Jul, 6 Aug, 13 Aug and 20 Aug. EM Flow Rule CARRIED from wk15 (2.2% SELL, week 5 of 8, expires ~17 Sep). NOT re-derived. Underlying: EM Wk %AUM 1.0 -> 0.3 -> -0.4 -> 0.0 and EM equity flow is now only -$0.4bn, far milder than last week's -$11.9bn. The suspension is now running on a number that is five editions old and whose underlying has round-tripped",
+      cashLevel: "3.6% CARRIED — SIXTH straight edition without a print. ⚠️ THE AUGUST FMS IS OUT: this edition cites 'Aug FMS' twice (Chart 3 midterm expectations, Chart 4 DEM-sweep reaction) so the survey exists and he has read it. He simply does not print the CASH level or the equity-allocation number in this note. Do NOT infer either from the charts he does show. The pre-registered read from wk18 (cash below 3.6% + equity >52% OW = take profits) therefore remains UNRESOLVED, not answered",
+      flows_pct: "Table 2 Wk %AUM: Total EM 0.0, China -0.1, Brazil -1.1, India -0.4, Total DM 0.1, US 0.2, Europe 0.0, Japan -0.1, International 0.1. China's -2.1% collapse did NOT continue (-0.1 this week) — one week, not a trend, at least so far. BRAZIL -1.1% IS NEGATIVE FOR A SECOND STRAIGHT WEEK and is again the worst line on the table",
+      flows_reconciled: "Cross-checked against Table 2 YTD before entry, not merely transcribed: US 404,690 -> 433,620 = +28,930mn vs printed $28.9bn ✓ · Japan 23,292 -> 21,581 = -1,711mn vs -$1.7bn ✓ · Europe -16,542 -> -16,299 = +243mn vs +$0.2bn ✓ · Total Equities 771,346 -> 811,435 = +40,089mn vs $40.1bn ✓ · Brazil 3,539 -> 3,305 = -234mn at -1.1% implies ~$21bn AUM, consistent with last week's ~$22bn",
+      flows_notable: "Weekly: $40.1bn stocks ($45.9bn ETFs MINUS $5.8bn mutual funds), $21.4bn bonds, $3.8bn gold, $1.0bn crypto, and $1.2bn OUT OF CASH — the first cash outflow in the series. US Treasuries +$7.4bn largest in 6 weeks. IG +$7.5bn, 20th straight week. EM debt +$3.3bn largest in 11 weeks. US equities +$28.9bn largest in 3 weeks. AGAINST: Korea -$0.8bn 1st outflow in 8 weeks; Japan -$1.7bn 1st in 11 weeks; semis -$0.7bn making -$6.3bn over 3 weeks; financials -$2.0bn biggest in 11 weeks. Bonds now 69 consecutive weeks of inflows, precious metals 7",
+      flows_style_sector: "By style: US large cap +$33.0bn dominates everything; small cap +$0.1bn barely positive; value -$0.2bn and growth -$0.5bn both out. By sector INFLOWS: tech +$2.3bn (reversing last week's -$1.2bn), materials +$1.5bn, com svs +$76mn. OUTFLOWS: energy -$22mn, real estate -$0.1bn, utils -$0.2bn, HEALTHCARE -$0.5bn, consumer goods -$0.5bn, FINANCIALS -$2.0bn biggest in 11 weeks. Note financials: he now explicitly recommends SHORT financials as the midterm hedge and the flow agrees, but XLF Hull is +0.94 green — the strongest sector reading on the board",
+      vix: "^VIX 15.13 close 2026-08-21, 11.9%ile — up from 14.25/2.8%ile. Still low but no longer at the extreme. SKEW 143.9 at 46.8%ile is the bigger move: it was 138.36 at the 9.1%ile a week ago. Tail hedging has gone from bottom-decile to mid-range in seven days while the index barely moved. Someone is buying protection",
+      skew: "143.9 @2026-08-21 from Cboe via pipeline. 9.1%ile -> 46.8%ile in one week. The single largest percentile move on the vol board",
+      pcRatio: "null — Cboe equity put/call still unsourced, board reports STALE_2515d_source_is_archive (asof 2019-10-04). Unchanged",
+      hull: "board.json asof 2026-08-21 VERBATIM (generated 2026-08-23T06:54:57Z, coverage 1.0, rows 157, 39 tickers). THREE WEEKLY FLIPS vs 8/14, all red -> GREEN: BTCUSD -0.18 -> +0.46 (decisive, not marginal), XLB -0.04 -> +0.04, XLP -0.00 -> +0.01. The last two are hairline and sit inside hysteresis — CHART-VERIFY. ⚠️ GOLD 3D FLIPPED GREEN: GLD 3D -0.19 -> +0.22 and GLTR 3D -0.44 -> +0.04, while both weeklies stay RED (GLD -0.90, GLTR -1.34). Weekly is still improving fast (-1.42 -> -1.22 -> -0.90 over three weeks). EWH 3D also flipped green (+0.07) with weekly still red -0.15. 3D disagrees with weekly on 6 of 39 (EEM, MCHI, EWH, SOXX, GLD, GLTR) = 85% agreement, unchanged",
+      contrarian: "This edition replaces the four buckets with explicit CONTRARIAN trades — he now states which side he is fading. Verbatim: 'Contrarian ABB Trade: secular consensus is ABB Anything but Bonds; we long unloved, long duration REITs/XBI/KRE/small cap' · 'Contrarian ABC trade: secular consensus is ABC Anywhere but China; we long Hong Kong property sector' · 'Contrarian ABD trade: secular consensus is ABD Anything but the Dollar; WE AGREE...long gold remains the cleanest dollar debasement trade' · 'Contrarian AI trade: secular consensus is long AI; we say short AI bonds...we recommend investors barbell their long AI stock exposure via commodities/natural resources' · 'Contrarian US midterms trade: consensus is DEMs will not sweep Nov midterms; WE HEDGE VIA SHORT FINANCIALS'",
+      usd_resolved: "★ THE USD QUESTION IS NOW ANSWERED IN PRINT. wk18 listed ABD as a descriptive regime and this tracker CARRIED the wk17 long-USD call rather than infer a reversal. wk19 removes the ambiguity: 'secular consensus is ABD Anything but the Dollar; WE AGREE'. He is aligned with anything-but-dollar, expressed through gold. The carried long-USD call from wk17 is therefore SUPERSEDED — not by inference this time, but by an explicit statement. Note he still never says 'short dollar'; the trade he names is long gold",
+      short_financials: "★ FIRST EXPLICIT SHORT IN FIVE EDITIONS. 'we hedge via short financials' as the midterm hedge, and in the failure case 'short cyclicals (financials) into midterms'. Flow agrees: financials -$2.0bn, biggest outflow in 11 weeks, and private clients are selling financial sector ETFs. PRICE DOES NOT: XLF Hull weekly +0.94, the strongest sector on the board, 3D +0.69. Two of three layers against the third",
+      bessent: "The organising idea: a succession of 'Bessent puts' — USD swap lines with Asia/Gulf, yen FX intervention, and now quasi-QE via DOUBLING long-bond buybacks with Fed acquiescence. Trigger: US national debt just crossed $40tn; $2tn net UST issuance in '26 and '27 crowds out corporates; hyperscaler bonds are now 9% of gross IG supply (from 1% in '24). His judgement: this should CAP but NOT REDUCE US bond yields. Preferred longs stated in the same breath: 'gold (obvs), and unloved long duration REITs/XBI/regional banks/small cap/HK property'",
+      failure_case: "Explicit and datable: if Bessent cannot drag the 30-year below 5%, then US dollar slump + short risk + short leverage (AI hyperscalers, private credit) + short cyclicals (financials) into midterms. He names PSP (Private Equity ETF) as the tell to watch for policy failure — Chart 11. PSP is NOT in the ticker universe; there is no Hull read on the one instrument he nominates as the failure gauge",
+      maginot: "Three lines being defended: $4/gallon gas, 160 USD/JPY, 5% UST. Gasoline is ALREADY back above $4 (from $3 pre-war) and hard to push down with SPR at a 44-year low and crude days-of-supply at 40-50 year lows. The 5% line is the one he calls 'the Big One'. Warsh at Jackson Hole 28 Aug 10am — same hour as BLS annual payroll revisions — must be 'just-hawkish-enough' to restore bond credibility WITHOUT torpedoing the dollar",
+      three_arrows: "US admin 0-for-3 on its own targets: 3% GDP growth (actual <2% for six quarters), 3% budget deficit (actual 6%), +3mbpd oil production (actual +0.3mbpd since '24). Trump approval 39% overall, 36% on economy, 30% on inflation — all well below pre-war averages of 46/42/38",
+      private_clients: "$4.7tn AUM, 66.5% stocks (from 66.4%), 16.9% bonds (from 17.0%), 9.4% cash (unchanged at the record low). Biggest weekly inflow to BONDS since May'26. Past 4wk ETF buying: Japan, muni bonds, TIPS. Selling: EM debt, utilities, FINANCIAL sector ETFs — the same sector Hartnett now says to short. Cumulative since 2020: $52bn to T-notes vs $28bn to T-bills, the gap still widening",
+      tape: "Scores on the Doors YTD: oil +53.0%, global stocks +13.9%, US stocks +11.6%, GOLD +4.0%, HY +2.6%, cash +2.3%, US DOLLAR +0.6%, IG +0.1%, govt bonds -1.1%, bitcoin -16.9%. Gold has gone -2.3% -> +1.0% -> +4.0% over three weeks. The dollar has faded +1.7% -> +0.6% in the same span, which is the ABD thesis showing up in the returns table. Bitcoin recovered from -27.9% to -16.9% in one week, which is what the Hull flip to green is measuring. Zeitgeist quote: 'I mean if private credit can't rally on QE5 then what is the world coming to'",
+    },
+  },
+];
+
+function computeSignal(assetId, w) {
+  const { flows, hullSignals, bb, pcRatio, emOutflow4wk } = w;
+  if (flows[assetId] === null || flows[assetId] === undefined) return "NO DATA";
+  const flow = flows[assetId];
+  const hull = hullSignals[assetId] ?? null; // v2.2: null = NO READ, matches no rule branch
+  const bbHi = hasVal(bb) && bb >= 8.0;
+  const bbXHi = hasVal(bb) && bb >= 8.5;
+  const pcLow = hasVal(pcRatio) && pcRatio < 0.5;
+  const emHi = hasVal(emOutflow4wk) && emOutflow4wk >= 3.0; // v2.3: aligned to documented EM Flow Trading Rule (buy when 4wk outflow >= 3% AUM)
+
+  if (["hk", "em", "thailand", "em_total"].includes(assetId)) {
+    if (hull === "green" && emHi) return "BUY";
+    if (flow < 0 && emHi) return "WATCH";
+    return "WAIT";
+  }
+  if (["em_brazil", "em_india", "em_china"].includes(assetId)) {
+    if (hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "BUY";
+    if (hull === "green") return "WATCH";
+    return "WAIT";
+  }
+  if (["sox", "ustech", "sec_tech"].includes(assetId)) {
+    if (bbHi && flow > 5 && pcLow) return "AVOID / PUT";
+    if (bbHi && flow > 3) return "REDUCE";
+    if (bbHi) return "REDUCE";
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (["gold", "precious_metals"].includes(assetId)) {
+    if (flow > 6) return "WATCH";                      // extreme inflow = top risk (lag 2-4wk)
+    if (hull === "red" && flow < 0) return "WAIT";     // v2.3: downtrend + outflow — was dead-branch HOLD
+    return "HOLD";
+  }
+  if (assetId === "bonds") {
+    if (flow > 25) return "HOLD";
+    if (flow < -10) return "BUY";
+    return "HOLD";
+  }
+  if (assetId === "ig_bonds") {
+    if (flow > 12) return "HOLD";
+    if (flow < -5) return "BUY";
+    return "HOLD";
+  }
+  if (assetId === "crypto") {
+    if (flow < -1 && hull === "red") return "WAIT";
+    if (hull === "green") return "WATCH";
+    return "WAIT";
+  }
+  if (assetId === "global_stocks") {
+    if (bbHi && flow < 0) return "REDUCE";
+    if (bbHi) return "REDUCE";
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (assetId === "japan_stocks") {
+    if (flow < 0 || hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (assetId === "europe_stocks") {
+    if (flow < 0 || hull === "red") return "WAIT";
+    return "NEUTRAL";
+  }
+  if (assetId === "china_stocks") {
+    if (hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "WATCH";
+    return "WAIT";
+  }
+  if (assetId === "us_largecap") {
+    if (bbHi && flow > 10) return "REDUCE";            // euphoric chase
+    if (bbXHi && flow < -5) return "REDUCE";           // v2.3: extreme sell-zone + heavy outflow — coherent with global_stocks
+    if (hull === "green") return "HOLD";
+    return "NEUTRAL";
+  }
+  if (assetId === "us_growth") {
+    if (bbHi) return "REDUCE";
+    if (hull === "green" && flow > 0) return "HOLD";
+    if (hull === "red") return "WAIT";
+    return "NEUTRAL";
+  }
+  if (assetId === "us_value") {
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (assetId === "us_smallcap") {
+    if (flow < -2) return "WAIT";
+    if (hull === "green" && flow > 0) return "WATCH";
+    return "NEUTRAL";
+  }
+  if (["sec_consumer", "sec_utilities", "sec_realestate"].includes(assetId)) {
+    if (bbXHi && hull === "green" && flow > 0) return "WATCH"; // v2.3: defensive-rotation idea kept, BUY demoted — no outright BUY under a live B&B sell signal
+    if (bbXHi && flow < 0) return "WATCH";
+    if (flow < -0.5 && hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (["sec_financials", "sec_hcare", "sec_comsvs"].includes(assetId)) {
+    if (flow < -1 && hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "HOLD";
+    return "NEUTRAL";
+  }
+  if (assetId === "sec_energy") {
+    if (hull === "green" && flow > 0) return "HOLD";
+    if (hull === "red" && flow < -1) return "WAIT";
+    return "NEUTRAL";
+  }
+  if (assetId === "sec_materials") {
+    if (bbXHi) return "WATCH";
+    if (!bbHi && hull === "green" && flow > 0) return "BUY"; // v2.3: BUY gated to B&B < 8.0
+    if (flow < -1.5) return "WAIT";
+    return "NEUTRAL";
+  }
+  return "NEUTRAL";
+}
+
+const SIG = {
+  "BUY":         { color: "#1FB94C", bg: "rgba(31,185,76,.12)",   icon: "▲" },
+  "AVOID / PUT": { color: "#F43F5E", bg: "rgba(244,63,94,.12)",   icon: "▼" },
+  "REDUCE":      { color: "#F97316", bg: "rgba(249,115,22,.12)",  icon: "↓" },
+  "WATCH":       { color: "#CA8A04", bg: "rgba(202,138,4,.12)",  icon: "◈" },
+  "HOLD":        { color: "#6D5BD0", bg: "rgba(109,91,208,.12)", icon: "■" },
+  "WAIT":        { color: "#6E6657", bg: "rgba(110,102,87,.12)",  icon: "○" },
+  "NEUTRAL":     { color: "#57534E", bg: "rgba(87,83,78,.12)", icon: "—" },
+  "NO DATA":     { color: "#B3A78F", bg: "rgba(179,167,143,.15)", icon: "∅" },
+};
+
+const PCT_AUM_ASSETS = new Set([
+  "em", "em_total", "em_china", "china_stocks",
+  "em_brazil", "em_india", "hk", "thailand",
+]);
+const flowUnit = id => PCT_AUM_ASSETS.has(id) ? "% AUM" : "$B";
+
+const EST_BASE = { hk: 1, em: 1, thailand: 1, china_stocks: 1, em_total: 1, em_brazil: 1, em_india: 1, em_china: 1, global_stocks: 1, japan_stocks: 1, europe_stocks: 1 };
+const EST_FLAGS = {
+  "2026-04-12": EST_BASE,
+  "2026-04-19": EST_BASE,
+  "2026-04-30": EST_BASE,
+  "2026-05-10": { hk: 1, thailand: 1 },
+  "2026-05-14": { hk: 1, thailand: 1 },
+  "2026-05-22": { hk: 1, thailand: 1 },
+  "2026-05-29": { hk: 1, thailand: 1 },
+  "2026-06-05": { hk: 1, thailand: 1, global_stocks: 1, japan_stocks: 1, europe_stocks: 1, sox: 1, ustech: 1 },
+  "2026-06-12": {},
+  "2026-06-19": {},
+  "2026-06-26": {},
+};
+// Imported weeks carry their own estFlags on the week object; seed weeks use the registry.
+const isEst = (w, id) => !!((w.estFlags && w.estFlags[id]) || (EST_FLAGS[w.date] && EST_FLAGS[w.date][id]));
+
+const PUT_VERDICT = {
+  "BUY PUT ★": { color: "#F43F5E", bg: "rgba(244,63,94,.18)",   icon: "▼★" },
+  "BUY PUT":   { color: "#F97316", bg: "rgba(249,115,22,.15)",  icon: "▼" },
+  "SPREAD":    { color: "#CA8A04", bg: "rgba(202,138,4,.12)",  icon: "⊞" },
+  "PREP":      { color: "#57534E", bg: "rgba(87,83,78,.10)", icon: "◷" },
+  "WAIT IV":   { color: "#6E6657", bg: "rgba(110,102,87,.10)",  icon: "○" },
+  "HOLD OFF":  { color: "#B3A78F", bg: "rgba(179,167,143,.08)",    icon: "–" },
+};
+
+const IV_REGIME_STYLE = {
+  "CHEAP":      { color: "#1FB94C", label: "CHEAP — good entry" },
+  "SUPPRESSED": { color: "#57534E", label: "SUPPRESSED — complacency" },
+  "FAIR":       { color: "#6D5BD0", label: "FAIR — normal cost" },
+  "ELEVATED":   { color: "#CA8A04", label: "ELEVATED — use spread" },
+  "EXPENSIVE":  { color: "#F43F5E", label: "EXPENSIVE — wait crush" },
+  "NO DATA":    { color: "#B3A78F", label: "NO IV DATA — pull source" },
+};
+
+// ── HULL PROXY TICKER MAP (rev 1.2, user-confirmed 2026-07-05) ─────────────────
+// Purpose: read Hull Suite on the ETF/index that mirrors the EPFR flow CATEGORY
+// (Hartnett's intent), NOT the user's individual holdings. Trend proxy only —
+// EPFR flows are global fund categories, XL* are US-only: direction yes, size no.
+// "consumer" = XLY by judgment call (Hartnett merges disc+staples; XLY more flow-sensitive).
+const TICKER_MAP = {
+  china_stocks: "MCHI", em: "EEM", em_total: "EEM", em_china: "MCHI",
+  em_brazil: "EWZ", em_india: "INDA", hk: "EWH", thailand: "THD",
+  sox: "SOXX", ustech: "XLK", sec_tech: "XLK",
+  gold: "GLD", precious_metals: "GLTR", bonds: "HYG", ig_bonds: "LQD", crypto: "BTCUSD",
+  global_stocks: "ACWI", japan_stocks: "EWJ", europe_stocks: "VGK",
+  us_largecap: "SPY", us_smallcap: "IWM", us_growth: "IWF", us_value: "IWD",
+  sec_comsvs: "XLC", sec_financials: "XLF", sec_hcare: "XLV", sec_utilities: "XLU",
+  sec_realestate: "XLRE", sec_energy: "XLE", sec_materials: "XLB", sec_consumer: "XLY",
+};
+
+const HULL_COLOR = { green: "#1FB94C", yellow: "#CA8A04", red: "#F43F5E" };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEEK PATCH VALIDATION — Update Protocol v4, Part E.2
+// Sanity gates run IN SOFTWARE, not by eye. Errors block commit; warnings need
+// explicit confirmation. Missing key = null, never 0.
+// ═══════════════════════════════════════════════════════════════════════════
+const MACRO_KEYS = ["bb", "pcRatio", "skew", "vix", "emOutflow4wk", "cashLevel"];
+const HULL_VALUES = new Set(["red", "yellow", "green"]);
+
+function validateWeekPatch(raw, history) {
+  const errors = [];
+  const warnings = [];
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { errors: ["Patch must be a JSON object."], warnings, week: null, dataVersion: null };
+  }
+  const wk = raw.week;
+  if (!wk || typeof wk !== "object" || Array.isArray(wk)) {
+    return { errors: ["Missing \"week\" object."], warnings, week: null, dataVersion: null };
+  }
+
+  // ── date: ISO, strictly after last stored week (append-only, Protocol A.7) ──
+  if (typeof wk.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(wk.date)) {
+    errors.push("week.date must be ISO YYYY-MM-DD.");
+  } else if (history && history.length > 0) {
+    const last = history[history.length - 1].date;
+    if (wk.date <= last) errors.push(`week.date ${wk.date} must be AFTER last stored week ${last} (append-only; no retro-edit).`);
+  }
+
+  // ── macro gates (Protocol B.1 / B.2 / B.3) ──
+  const num = (k) => {
+    const v = wk[k];
+    if (v === undefined || v === null) return null;
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(`${k} must be a number or null.`); return null; }
+    return v;
+  };
+  const bb = num("bb"), pcRatio = num("pcRatio"), skew = num("skew"), vix = num("vix");
+  const emOut = num("emOutflow4wk"), cash = num("cashLevel");
+
+  if (pcRatio !== null && pcRatio >= 0.85)
+    errors.push(`pcRatio ${pcRatio} ≥ 0.85 ⇒ TOTAL P/C series (B.1 trap, cf. wk11 0.99-total vs 0.67-equity). Re-pull the EQUITY series (MacroMicro 1640 / ycharts cboe_equity_put_call_ratio).`);
+  if (pcRatio !== null && pcRatio < 0.2)
+    warnings.push(`pcRatio ${pcRatio} below the historical equity band (0.40–0.67) — verify series.`);
+  if (skew !== null && (skew < 100 || skew > 190))
+    errors.push(`skew ${skew} outside 100–190 — not a plausible ^SKEW close.`);
+  if (vix !== null && (vix < 5 || vix > 100))
+    errors.push(`vix ${vix} outside 5–100 — not a plausible ^VIX close.`);
+  if (bb !== null && (bb < 0 || bb > 10))
+    errors.push(`bb ${bb} outside 0–10 — B&B is a 0–10 indicator.`);
+  if (cash !== null && (cash < 1 || cash > 8))
+    warnings.push(`cashLevel ${cash}% unusual for FMS cash (typical 3.5–6.2) — verify it is FMS, not GWIM private-client cash.`);
+  MACRO_KEYS.forEach(k => { if (wk[k] === undefined) warnings.push(`${k} missing → stored as null (Protocol: null over estimate). Confirm it is genuinely unsourced (nullLog).`); });
+
+  // ── flows: known ids, unit sanity ──
+  const flows = {};
+  if (wk.flows && typeof wk.flows === "object" && !Array.isArray(wk.flows)) {
+    Object.entries(wk.flows).forEach(([id, v]) => {
+      if (!KNOWN_FLOW_IDS.has(id)) { warnings.push(`flows.${id}: unknown asset id — ignored.`); return; }
+      if (v === null) { flows[id] = null; return; }
+      if (typeof v !== "number" || !isFinite(v)) { errors.push(`flows.${id} must be a number or null.`); return; }
+      if (PCT_AUM_ASSETS.has(id) && Math.abs(v) > 15)
+        warnings.push(`flows.${id} = ${v} — |v|>15 on a %AUM field: likely a $bn figure pasted into a %AUM asset.`);
+      if (!PCT_AUM_ASSETS.has(id) && Math.abs(v) > 150)
+        warnings.push(`flows.${id} = ${v} — |v|>150 $bn: likely a unit error ($mn vs $bn?).`);
+      flows[id] = v;
+    });
+  } else if (wk.flows !== undefined) {
+    errors.push("week.flows must be an object.");
+  }
+
+  // ── hullSignals: enum-checked ──
+  const hullSignals = {};
+  if (wk.hullSignals && typeof wk.hullSignals === "object" && !Array.isArray(wk.hullSignals)) {
+    Object.entries(wk.hullSignals).forEach(([id, v]) => {
+      if (!KNOWN_FLOW_IDS.has(id)) { warnings.push(`hullSignals.${id}: unknown asset id — ignored.`); return; }
+      if (!HULL_VALUES.has(v)) { errors.push(`hullSignals.${id} = "${v}" — must be red | yellow | green.`); return; }
+      hullSignals[id] = v;
+    });
+  } else if (wk.hullSignals !== undefined) {
+    errors.push("week.hullSignals must be an object.");
+  }
+  if (Object.keys(hullSignals).length === 0)
+    warnings.push("No hullSignals in patch — all assets default to red until you set your manual Hull read.");
+
+  // ── normalize: missing = null, never 0 ──
+  const week = {
+    date: wk.date,
+    bb, pcRatio, skew, vix, emOutflow4wk: emOut, cashLevel: cash,
+    flows, hullSignals,
+    title: typeof raw.reportTitle === "string" ? raw.reportTitle : (typeof wk.title === "string" ? wk.title : ""),
+    estFlags: (raw.estFlags && typeof raw.estFlags === "object") ? raw.estFlags : {},
+    srcNotes: (raw.srcNotes && typeof raw.srcNotes === "object") ? raw.srcNotes : {},
+  };
+  const dataVersion = typeof raw.patchVersion === "string" && raw.patchVersion ? raw.patchVersion : `wk-${wk.date}`;
+  const nNull = MACRO_KEYS.filter(k => week[k] === null).length;
+  const nFlows = Object.values(flows).filter(v => v !== null).length;
+
+  return { errors, warnings, week, dataVersion, summary: { nFlows, nHull: Object.keys(hullSignals).length, nNullMacro: nNull } };
+}
+
+function Badge({ signal, map = SIG }) {
+  const m = map[signal] || SIG.NEUTRAL;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "3px 9px", borderRadius: 3, background: m.bg, color: m.color,
+      fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, fontWeight: 700,
+      letterSpacing: ".08em", border: `1px solid ${m.color}33`,
+    }}>
+      <span style={{ fontSize: 8 }}>{m.icon}</span>{signal}
+    </span>
+  );
+}
+
+function IVGauge({ impliedIV, fairIV, putBuy, putThresh, ivLo, ivHi }) {
+  const lo  = ivLo  || putBuy  * 0.7;
+  const hi  = ivHi  || putThresh * 1.2;
+  const axMin = Math.min(lo * 0.85, putBuy  * 0.8);
+  const axMax = Math.max(hi * 1.05, putThresh * 1.1);
+  const span  = axMax - axMin || 1;
+  const pct = v => Math.min(99, Math.max(1, ((v - axMin) / span) * 100));
+
+  const ivColor = impliedIV <= putBuy    ? "#1FB94C"
+                : impliedIV >= putThresh ? "#F43F5E"
+                : impliedIV >= putThresh * 0.88 ? "#CA8A04"
+                : "#57534E";
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <span style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em", fontFamily: "'IBM Plex Mono',monospace" }}>
+          IV GAUGE
+          {ivLo && ivHi && <span style={{ color: "#B3A78F", marginLeft: 4 }}>52wk {ivLo}–{ivHi}%</span>}
+        </span>
+        <span style={{ fontSize: 9, color: ivColor, fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>
+          {impliedIV.toFixed(1)}%
+        </span>
+      </div>
+      <div style={{ position: "relative", height: 8, background: "#E2D3B8", borderRadius: 4, overflow: "visible" }}>
+        <div style={{ position: "absolute", left: 0, width: `${pct(putBuy)}%`, height: "100%", background: "rgba(31,185,76,.18)", borderRadius: "4px 0 0 4px" }} />
+        <div style={{ position: "absolute", left: `${pct(putThresh)}%`, right: 0, height: "100%", background: "rgba(244,63,94,.18)", borderRadius: "0 4px 4px 0" }} />
+        {ivLo && <div style={{ position: "absolute", left: `${pct(ivLo)}%`, top: -2, width: 1, height: 5, background: "#B3A78F" }} />}
+        {ivHi && <div style={{ position: "absolute", left: `${pct(ivHi)}%`, top: -2, width: 1, height: 5, background: "#B3A78F" }} />}
+        <div style={{ position: "absolute", left: `${pct(fairIV)}%`, top: -3, width: 1, height: 14, background: "#8A7E68", opacity: 0.8 }} />
+        <div style={{
+          position: "absolute", left: `${pct(impliedIV)}%`, top: "50%",
+          transform: "translate(-50%,-50%)",
+          width: 11, height: 11, borderRadius: "50%",
+          background: ivColor, boxShadow: `0 0 7px ${ivColor}88`,
+          border: "1.5px solid #FFFBF2", zIndex: 2,
+        }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+        <span style={{ fontSize: 7, color: "#1FB94C", fontFamily: "'IBM Plex Mono',monospace" }}>CHEAP&lt;{putBuy}</span>
+        <span style={{ fontSize: 7, color: "#8A7E68", fontFamily: "'IBM Plex Mono',monospace" }}>FAIR≈{fairIV.toFixed(0)}</span>
+        <span style={{ fontSize: 7, color: "#F43F5E", fontFamily: "'IBM Plex Mono',monospace" }}>EXP&gt;{putThresh}</span>
+      </div>
+    </div>
+  );
+}
+
+function HullPicker({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+      {["red", "yellow", "green"].map(c => (
+        <button key={c} onClick={() => onChange(c)} style={{
+          width: 12, height: 12, borderRadius: "50%", cursor: "pointer", padding: 0,
+          background: value === c ? HULL_COLOR[c] : "transparent",
+          border: `2px solid ${HULL_COLOR[c]}`,
+          boxShadow: value === c ? `0 0 5px ${HULL_COLOR[c]}` : "none",
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function Num({ label, value, onChange, step = 0.1 }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <label style={{ fontSize: 8, color: "#8A7E68", letterSpacing: ".1em", fontFamily: "'IBM Plex Mono',monospace", textTransform: "uppercase" }}>{label}</label>
+      <input type="number" value={value ?? ""} step={step} placeholder="null"
+        onChange={e => onChange(e.target.value === "" ? null : (parseFloat(e.target.value) || 0))}
+        style={{
+          width: 68, padding: "4px 6px", background: "#F6EBD9",
+          border: "1px solid #E2D3B8", borderRadius: 3,
+          color: hasVal(value) ? "#1A1A1A" : "#B3A78F", fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, outline: "none",
+        }} />
+    </div>
+  );
+}
+
+function MiniBarChart({ history, assetId }) {
+  const vals = history.map(w => (w.flows[assetId] === undefined ? null : w.flows[assetId]));
+  const absMax = Math.max(...vals.filter(v => v !== null).map(Math.abs), 0.1);
+  const chartH = 40; const barW = 9; const gap = 3;
+  const totalW = vals.length * (barW + gap) - gap;
+  const isPct = PCT_AUM_ASSETS.has(assetId);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+        <span style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em", fontFamily: "'IBM Plex Mono',monospace" }}>
+          {history.length}-WK FLOW ({flowUnit(assetId)})
+        </span>
+        {isPct && <span style={{ fontSize: 6, color: "#8A7E6866", fontFamily: "'IBM Plex Mono',monospace" }}>*wk1-3 est | hk,th all est</span>}
+      </div>
+      <svg width={totalW} height={chartH + 12} style={{ overflow: "visible" }}>
+        <line x1={0} y1={chartH / 2} x2={totalW} y2={chartH / 2} stroke="#E2D3B8" strokeWidth={1} />
+        {vals.map((v, i) => {
+          const isLast = i === vals.length - 1;
+          if (v === null) return (
+            <rect key={i} x={i * (barW + gap)} y={chartH / 2 - 4} width={barW} height={8}
+              fill="none" stroke="#B3A78F" strokeWidth={1} strokeDasharray="2,2" rx={1} />
+          );
+          const ratio = Math.abs(v) / absMax;
+          const barH = Math.max(2, ratio * (chartH / 2 - 2));
+          const x = i * (barW + gap);
+          const isPos = v >= 0;
+          const color = isLast ? (isPos ? "#1FB94C" : "#F43F5E") : (isPos ? "#1FB94C44" : "#F43F5E44");
+          const y = isPos ? chartH / 2 - barH : chartH / 2;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barW} height={barH} fill={color} rx={1} />
+              {isLast && (
+                <text x={x + barW / 2} y={isPos ? y - 2 : y + barH + 8} textAnchor="middle" fontSize={7}
+                  fill={isPos ? "#1FB94C" : "#F43F5E"} fontFamily="'IBM Plex Mono',monospace">
+                  {v >= 0 ? "+" : ""}{v.toFixed(1)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function SignalTrail({ history, assetId }) {
+  const signals = history.map(w => computeSignal(assetId, w));
+  return (
+    <div style={{ display: "flex", gap: 2, marginTop: 6, alignItems: "center" }}>
+      <span style={{ fontSize: 7, color: "#8A7E68", fontFamily: "'IBM Plex Mono',monospace", marginRight: 3, whiteSpace: "nowrap" }}>TRAIL →</span>
+      {signals.map((s, i) => {
+        const m = SIG[s] || SIG.NEUTRAL;
+        const isLast = i === signals.length - 1;
+        return (
+          <div key={i} title={`${history[i].date}: ${s}`} style={{
+            width: isLast ? 10 : 7, height: isLast ? 10 : 7, borderRadius: 2,
+            background: m.color, opacity: isLast ? 1 : 0.35 + (i / signals.length) * 0.5, flexShrink: 0,
+          }} />
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPORT WEEK PANEL (Protocol v4, Part E.2/E.3)
+// Paste WEEK PATCH JSON → validate → review diff → commit (append + auto-save).
+// ═══════════════════════════════════════════════════════════════════════════
+function ImportWeekPanel({ history, onCommit }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [result, setResult] = useState(null); // {errors, warnings, week, dataVersion, summary} | {parseError}
+  const [committing, setCommitting] = useState(false);
+
+  const mono = { fontFamily: "'IBM Plex Mono',monospace" };
+
+  const runValidate = () => {
+    let raw;
+    try { raw = JSON.parse(text); }
+    catch (e) { setResult({ parseError: "JSON parse failed: " + e.message }); return; }
+    setResult(validateWeekPatch(raw, history));
+  };
+
+  const commit = async () => {
+    if (!result || !result.week || result.errors.length > 0 || committing) return;
+    setCommitting(true);
+    await onCommit(result.week, result.dataVersion);
+    setCommitting(false);
+    setText(""); setResult(null); setOpen(false);
+  };
+
+  const canCommit = result && result.week && result.errors && result.errors.length === 0;
+
+  return (
+    <div style={{ background: "#F6EBD9", border: "1px solid #1FB94C40", borderRadius: 6, marginBottom: 16, overflow: "hidden" }}>
+      <button onClick={() => setOpen(!open)} style={{
+        width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer",
+        display: "flex", justifyContent: "space-between", alignItems: "center", ...mono,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 9, color: "#1FB94C", letterSpacing: ".15em", fontWeight: 700 }}>⇪ IMPORT WEEK</span>
+          <span style={{ fontSize: 8, color: "#6E6657" }}>paste WEEK PATCH JSON — no code regen (Protocol v4 · Part E)</span>
+        </div>
+        <span style={{ fontSize: 7, color: "#8A7E68" }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "0 14px 16px", borderTop: "1px solid #E2D3B8" }}>
+          <div style={{ fontSize: 7, color: "#8A7E68", marginTop: 11, marginBottom: 6, lineHeight: 1.6 }}>
+            Expected shape: {"{ patchVersion, reportTitle, week: { date, bb, pcRatio, skew, vix, emOutflow4wk, cashLevel, flows{}, hullSignals{} }, estFlags{}, srcNotes{}, nullLog[] }"} · missing key = null, never 0 · date must be after {history[history.length - 1].date}
+          </div>
+          <textarea value={text} onChange={e => { setText(e.target.value); setResult(null); }}
+            placeholder='{"patchVersion":"wk12-2026-07-03","reportTitle":"…","week":{"date":"2026-07-03", …}}'
+            spellCheck={false}
+            style={{
+              width: "100%", minHeight: 130, boxSizing: "border-box", resize: "vertical",
+              background: "#FFFBF2", border: "1px solid #E2D3B8", borderRadius: 4,
+              padding: "8px 10px", color: "#1A1A1A", ...mono, fontSize: 10, outline: "none", lineHeight: 1.5,
+            }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <button onClick={runValidate} disabled={!text.trim()} style={{
+              padding: "5px 14px", borderRadius: 3, cursor: text.trim() ? "pointer" : "default", ...mono, fontSize: 10, fontWeight: 700,
+              background: "transparent", border: "1px solid #111111", color: text.trim() ? "#111111" : "#B3A78F", opacity: text.trim() ? 1 : 0.5,
+            }}>1 · VALIDATE</button>
+            <button onClick={commit} disabled={!canCommit} style={{
+              padding: "5px 14px", borderRadius: 3, cursor: canCommit ? "pointer" : "default", ...mono, fontSize: 10, fontWeight: 700,
+              background: canCommit ? "#1FB94C20" : "transparent",
+              border: `1px solid ${canCommit ? "#1FB94C" : "#E2D3B8"}`,
+              color: canCommit ? "#1FB94C" : "#B3A78F",
+            }}>{committing ? "COMMITTING…" : "2 · COMMIT & SAVE"}</button>
+            {result && result.warnings && result.warnings.length > 0 && canCommit && (
+              <span style={{ fontSize: 8, color: "#CA8A04" }}>⚠ {result.warnings.length} warning(s) — review below, commit is allowed</span>
+            )}
+          </div>
+
+          {result && result.parseError && (
+            <div style={{ marginTop: 10, padding: "8px 11px", background: "rgba(244,63,94,.08)", border: "1px solid #F43F5E40", borderRadius: 4, fontSize: 9, color: "#F43F5E", ...mono }}>
+              ✕ {result.parseError}
+            </div>
+          )}
+
+          {result && result.errors && result.errors.length > 0 && (
+            <div style={{ marginTop: 10, padding: "8px 11px", background: "rgba(244,63,94,.08)", border: "1px solid #F43F5E40", borderRadius: 4 }}>
+              <div style={{ fontSize: 8, color: "#F43F5E", fontWeight: 700, letterSpacing: ".1em", marginBottom: 5 }}>✕ REJECTED — {result.errors.length} ERROR(S), COMMIT BLOCKED</div>
+              {result.errors.map((e, i) => (
+                <div key={i} style={{ fontSize: 8, color: "#B91C3C", lineHeight: 1.6 }}>· {e}</div>
+              ))}
+            </div>
+          )}
+
+          {result && result.warnings && result.warnings.length > 0 && (
+            <div style={{ marginTop: 8, padding: "8px 11px", background: "rgba(202,138,4,.08)", border: "1px solid #CA8A0440", borderRadius: 4 }}>
+              <div style={{ fontSize: 8, color: "#CA8A04", fontWeight: 700, letterSpacing: ".1em", marginBottom: 5 }}>⚠ WARNINGS — review before commit</div>
+              {result.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: 8, color: "#8A6A1F", lineHeight: 1.6 }}>· {w}</div>
+              ))}
+            </div>
+          )}
+
+          {canCommit && (
+            <div style={{ marginTop: 8, padding: "8px 11px", background: "rgba(31,185,76,.07)", border: "1px solid #1FB94C40", borderRadius: 4 }}>
+              <div style={{ fontSize: 8, color: "#1FB94C", fontWeight: 700, letterSpacing: ".1em", marginBottom: 5 }}>✓ DIFF PREVIEW — {result.dataVersion}</div>
+              <div style={{ fontSize: 8, color: "#5C5546", lineHeight: 1.8 }}>
+                <div>Append week <b>{result.week.date}</b> {result.week.title ? `· "${result.week.title}"` : ""} → window {history.length} → {history.length + 1} wk (no wk1 drop)</div>
+                <div>Macro: B&B {fmtNum(result.week.bb, 1)} · P/C {fmtNum(result.week.pcRatio, 2)} · SKEW {fmtNum(result.week.skew, 1)} · VIX {fmtNum(result.week.vix, 2)} · EM4wk {fmtNum(result.week.emOutflow4wk, 1)} · Cash {fmtNum(result.week.cashLevel, 1)} ({result.summary.nNullMacro} null)</div>
+                <div>Flows: {result.summary.nFlows} sourced values · Hull: {result.summary.nHull} set{result.summary.nHull === 0 ? " (all default red — set via EDIT WEEK after commit)" : ""} · estFlags: {Object.keys(result.week.estFlags).length === 0 ? "{} (none — preferred)" : Object.keys(result.week.estFlags).join(", ")}</div>
+                {Object.keys(result.week.srcNotes).length > 0 && (
+                  <div style={{ color: "#8A7E68" }}>src: {Object.entries(result.week.srcNotes).map(([k, v]) => `${k}=${v}`).join(" · ")}</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function HartnettTrackerPutV2() {
+  const [history, setHistory] = useState(null);
+  const [dataVersion, setDataVersion] = useState("seed");
+  const [activeWeek, setActiveWeek] = useState(10);
+  const [activeGroup, setActiveGroup] = useState("Core Assets");
+  const [editOpen, setEditOpen] = useState(false);
+  const [storageOk, setStorageOk] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState("cards");
+  const [showPutPanel, setShowPutPanel] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const stored = await loadHistory();
+      if (stored && Array.isArray(stored.history) && stored.history.length >= 1) {
+        setHistory(stored.history); setDataVersion(stored.dataVersion);
+        setActiveWeek(stored.history.length - 1); setStorageOk(true);
+      } else {
+        setHistory(SEEDED_HISTORY); setDataVersion("seed");
+        setActiveWeek(SEEDED_HISTORY.length - 1); setStorageOk(false);
+      }
+    })();
+  }, []);
+
+  const week = history ? history[activeWeek] : null;
+
+  const updateWeek = useCallback((fn) => {
+    setHistory(prev => prev.map((w, i) => i === activeWeek ? fn(w) : w));
+    setSaved(false);
+  }, [activeWeek]);
+
+  const handleSave = async () => {
+    if (!history) return;
+    await saveHistory(history, dataVersion); setSaved(true); setStorageOk(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleReset = async () => {
+    await clearHistory();
+    setHistory(SEEDED_HISTORY); setDataVersion("seed");
+    setActiveWeek(SEEDED_HISTORY.length - 1); setStorageOk(false);
+  };
+
+  // Protocol v4 E.3: patch commit = append week + stamp DATA_VERSION + auto-save.
+  const handlePatchCommit = async (newWeek, newDataVersion) => {
+    const next = [...history, newWeek];
+    setHistory(next); setDataVersion(newDataVersion);
+    setActiveWeek(next.length - 1);
+    await saveHistory(next, newDataVersion);
+    setStorageOk(true); setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const addWeek = () => {
+    const last = history[history.length - 1];
+    const d = new Date(last.date); d.setDate(d.getDate() + 7);
+    const fresh = { ...last, date: d.toISOString().split("T")[0], title: "", flows: { ...last.flows }, hullSignals: { ...last.hullSignals } };
+    setHistory(prev => [...prev, fresh]);
+    setActiveWeek(history.length); setSaved(false);
+  };
+
+  if (!history || !week) return (
+    <div style={{ minHeight: "100vh", background: "#FFFBF2", display: "flex", alignItems: "center", justifyContent: "center", color: "#6E6657", fontFamily: "'IBM Plex Mono',monospace", fontSize: 12 }}>LOADING…</div>
+  );
+
+  const mono = { fontFamily: "'IBM Plex Mono',monospace" };
+  const currentAssets = ASSET_GROUPS[activeGroup] || [];
+  const bbColor = hasVal(week.bb) && week.bb >= 8.0 ? "#F43F5E" : hasVal(week.bb) && week.bb <= 2.0 ? "#1FB94C" : "#57534E";
+  const lastIdx = history.length - 1;
+
+  const allPutOpps = ALL_ASSETS.map(asset => {
+    const iv = computeIV(asset.id, week);
+    const sig = computeSignal(asset.id, week);
+    return { ...asset, iv, sig };
+  }).filter(a => ["BUY PUT ★", "BUY PUT", "SPREAD", "PREP"].includes(a.iv.putVerdict))
+    .sort((a, b) => {
+      const rank = { "BUY PUT ★": 0, "BUY PUT": 1, "SPREAD": 2, "PREP": 3 };
+      return rank[a.iv.putVerdict] - rank[b.iv.putVerdict];
+    });
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#FFFBF2", color: "#1A1A1A", ...mono, padding: "20px 18px" }}>
+
+      {/* Header */}
+      <div style={{ borderBottom: "1px solid #E2D3B8", paddingBottom: 16, marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 9, color: "#111111", letterSpacing: ".2em", marginBottom: 4 }}>HARTNETT TRACKER WITH PUT {TRACKER_VERSION} · IMPORT WEEK (PROTOCOL v4) · HULL SUITE · IV SOURCED/NULL · CREAM</div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#000000", letterSpacing: "-.02em" }}>Hartnett Tracker with Put {TRACKER_VERSION}</h1>
+            <div style={{ fontSize: 8, color: "#8A7E68", marginTop: 3 }}>{history[0].date} – {history[lastIdx].date} · {history.length}-week history · 28 assets · weekly updates via IMPORT WEEK patch (no code regen) · momentum = Hull Suite · IV = Cboe indices (fresh) + ETF IV30 (⚠STALE excluded from Put Radar) · — = null</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 7, color: "#B3A78F" }} title="code structure version — bumps only on structural change">build {SEED_VERSION}</span>
+            <span style={{ fontSize: 7, color: "#8A7E68" }} title="stamped per accepted weekly patch">data {dataVersion}</span>
+            <span style={{ fontSize: 8, color: storageOk ? "#1FB94C" : "#6E6657" }}>{storageOk ? "● SHARED" : "○ LOCAL (seed)"}</span>
+            <button onClick={handleReset} style={{
+              padding: "5px 10px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 9, fontWeight: 700,
+              background: "transparent", border: "1px solid #B3A78F", color: "#8A7E68",
+            }} title="clear shared storage → everyone reloads current seed (imported weeks are lost)">↺ RESET</button>
+            <button onClick={handleSave} style={{
+              padding: "5px 14px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 10, fontWeight: 700,
+              background: saved ? "#1FB94C20" : "#11111120", border: `1px solid ${saved ? "#1FB94C" : "#111111"}`,
+              color: saved ? "#1FB94C" : "#111111",
+            }}>{saved ? "✓ SAVED" : "SAVE"}</button>
+          </div>
+        </div>
+
+        {/* Macro tiles */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 8, marginTop: 14 }}>
+          {[
+            { label: "Bull & Bear", value: fmtNum(week.bb, 1), sub: !hasVal(week.bb) ? "NO DATA" : week.bb >= 8 ? "SELL SIGNAL" : week.bb <= 2 ? "BUY SIGNAL" : "NEUTRAL", color: hasVal(week.bb) ? bbColor : "#B3A78F" },
+            { label: "P/C Ratio",   value: fmtNum(week.pcRatio, 2), sub: !hasVal(week.pcRatio) ? "NO DATA" : week.pcRatio < 0.42 ? "PUT CHEAP" : week.pcRatio < 0.46 ? "FOMO" : "NEUTRAL", color: !hasVal(week.pcRatio) ? "#B3A78F" : week.pcRatio < 0.42 ? "#1FB94C" : week.pcRatio < 0.46 ? "#F43F5E" : "#57534E" },
+            { label: "VIX",         value: fmtNum(week.vix, 1), sub: !hasVal(week.vix) ? "NO DATA" : week.vix < 16 ? "PUT CHEAP" : week.vix > 25 ? "PUT EXPENSIVE" : "NORMAL", color: !hasVal(week.vix) ? "#B3A78F" : week.vix < 16 ? "#1FB94C" : week.vix > 25 ? "#F43F5E" : "#57534E" },
+            { label: "SKEW",        value: fmtNum(week.skew, 0), sub: !hasVal(week.skew) ? "NO DATA" : week.skew > 140 ? "TAIL RISK" : week.skew > 130 ? "ELEVATED" : "NORMAL", color: !hasVal(week.skew) ? "#B3A78F" : week.skew > 140 ? "#F43F5E" : week.skew > 130 ? "#CA8A04" : "#57534E" },
+            // v2.6.0: ถอดไทล์ "EM Out 4wk" ออกจากแถบ macro ตามคำสั่งผู้ใช้
+            // ฟิลด์ emOutflow4wk ยังอยู่ครบ และ EM Flow Trading Rule ยังทำงาน
+            // เหมือนเดิมทุกประการ (บรรทัด emHi + regime suspension) — เอาออกจาก
+            // "การแสดงผล" ไม่ใช่เอาออกจาก "กฎ"
+            //
+            // อนุสัญญาที่ยืนยันแล้วจาก srcNotes ของสัปดาห์ 07-03 / 07-10 / 07-24:
+            //   เก็บ = ค่าที่ BofA พิมพ์ x (-1)  [outflow เป็นบวก]
+            //   BofA -0.3% (outflow) -> เก็บ +0.3
+            //   BofA +2.2% (inflow)  -> เก็บ -2.2
+            // ดังนั้น emHi = emOutflow4wk >= 3.0 ตรงกับกฎ "Buy when outflows
+            // from EM equities > 3.0% of AUM" อยู่แล้ว ห้ามกลับเครื่องหมาย
+            { label: "FMS Cash",    value: fmtNum(week.cashLevel, 1, "%"), sub: !hasVal(week.cashLevel) ? "NO DATA" : week.cashLevel < 4 ? "SELL SIGNAL" : "NEUTRAL", color: !hasVal(week.cashLevel) ? "#B3A78F" : week.cashLevel < 4 ? "#F43F5E" : "#57534E" },
+          ].map(m => (
+            <div key={m.label} style={{ background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 5, padding: "9px 11px" }}>
+              <div style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 3 }}>{m.label}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: m.color, lineHeight: 1 }}>{m.value}</div>
+              <div style={{ fontSize: 7, color: m.color, marginTop: 2, opacity: .8 }}>{m.sub}</div>
+            </div>
+          ))}
+        </div>
+        {week.srcNotes && Object.keys(week.srcNotes).length > 0 && (
+          <div style={{ fontSize: 7, color: "#8A7E68", marginTop: 6, lineHeight: 1.6 }}>
+            SRC · {Object.entries(week.srcNotes).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+          </div>
+        )}
+      </div>
+
+      {/* Week selector */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 7, color: "#8A7E68", marginRight: 3 }}>WEEK:</span>
+        {history.map((w, i) => (
+          <button key={i} onClick={() => { setActiveWeek(i); setEditOpen(false); }} style={{
+            padding: "3px 9px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 8,
+            background: i === activeWeek ? "#111111" : "transparent",
+            border: `1px solid ${i === activeWeek ? "#111111" : "#E2D3B8"}`,
+            color: i === activeWeek ? "#fff" : "#5C5546",
+          }}>
+            {i === lastIdx ? "★ " : ""}{w.date.slice(5)}
+            {titleOf(w, i) ? <span style={{ color: i === activeWeek ? "#D9D9D9" : "#8A7E68", marginLeft: 4 }}>{titleOf(w, i)}</span> : null}
+          </button>
+        ))}
+        <button onClick={addWeek} style={{ padding: "3px 9px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 8, background: "transparent", border: "1px solid #E2D3B8", color: "#111111" }}>+ ADD WEEK</button>
+      </div>
+
+      {/* IMPORT WEEK panel — the v2.0 weekly workflow */}
+      <ImportWeekPanel history={history} onCommit={handlePatchCommit} />
+
+      {/* Edit panel */}
+      <div style={{ background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 6, marginBottom: 16, overflow: "hidden" }}>
+        <button onClick={() => setEditOpen(!editOpen)} style={{
+          width: "100%", padding: "9px 14px", background: "none", border: "none",
+          color: "#5C5546", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", ...mono, fontSize: 9, letterSpacing: ".1em",
+        }}>
+          <span>▸ EDIT WEEK {week.date} — {titleOf(week, activeWeek)}</span>
+          <span style={{ fontSize: 7 }}>{editOpen ? "▲ COLLAPSE" : "▼ EXPAND"}</span>
+        </button>
+        {editOpen && (
+          <div style={{ padding: "0 14px 16px", borderTop: "1px solid #E2D3B8" }}>
+            <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginTop: 11, marginBottom: 9 }}>MACRO <span style={{ color: "#8A7E68", letterSpacing: 0 }}>· clear a field = null (NO DATA), not 0</span></div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
+              <Num label="Bull&Bear"  value={week.bb}           onChange={v => updateWeek(w => ({ ...w, bb: v }))} />
+              <Num label="P/C Ratio"  value={week.pcRatio}      onChange={v => updateWeek(w => ({ ...w, pcRatio: v }))} step={0.01} />
+              <Num label="VIX"        value={week.vix}          onChange={v => updateWeek(w => ({ ...w, vix: v }))} />
+              <Num label="SKEW"       value={week.skew}         onChange={v => updateWeek(w => ({ ...w, skew: v }))} step={1} />
+              <Num label="EM Out 4wk" value={week.emOutflow4wk} onChange={v => updateWeek(w => ({ ...w, emOutflow4wk: v }))} />
+              <Num label="FMS Cash"   value={week.cashLevel}    onChange={v => updateWeek(w => ({ ...w, cashLevel: v }))} />
+            </div>
+            <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginBottom: 9 }}>{activeGroup.toUpperCase()} FLOWS ({currentAssets.some(a => PCT_AUM_ASSETS.has(a.id)) ? "% AUM / $B mixed" : "$B"}) + HULL SUITE <span style={{ color: "#8A7E68", letterSpacing: 0 }}>· your manual HMA trend read · 🟢bull 🟡flat 🔴bear</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(185px,1fr))", gap: 7 }}>
+              {currentAssets.map(a => (
+                <div key={a.id} style={{ background: "#FFFBF2", border: "1px solid #E2D3B8", borderRadius: 4, padding: "7px 9px" }}>
+                  <div style={{ fontSize: 8, color: "#5C5546", marginBottom: 5 }}>{a.label} <span style={{color:"#8A7E68",fontSize:7}}>{flowUnit(a.id)}</span>{TICKER_MAP[a.id] && <span style={{color:"#B3A78F",fontSize:7}}> · Hull: {TICKER_MAP[a.id]}</span>}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <input type="number" step={0.1} value={week.flows[a.id] ?? ""}
+                      placeholder="null"
+                      onChange={e => updateWeek(w => ({ ...w, flows: { ...w.flows, [a.id]: e.target.value === "" ? null : (parseFloat(e.target.value) || 0) } }))}
+                      style={{ width: 60, padding: "3px 5px", background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 3, outline: "none", color: week.flows[a.id] === null || week.flows[a.id] === undefined ? "#B3A78F" : week.flows[a.id] >= 0 ? "#1FB94C" : "#F43F5E", ...mono, fontSize: 11 }} />
+                    <HullPicker value={week.hullSignals[a.id] ?? null}
+                      onChange={v => updateWeek(w => ({ ...w, hullSignals: { ...w.hullSignals, [a.id]: v } }))} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── PROVENANCE BANNER ─────────────────────────────────────────────
+          WHY THIS EXISTS: a published artifact serves the version that was
+          selected when Publish was pressed, not the newest one. On 2026-08-22
+          a shared copy had been showing v2.7.0 for days — 17 weeks instead of
+          18, VIX 14.9 instead of 14.25, and the hardcoded IV block that has
+          since been nulled — and nothing on screen said so. You had to know
+          the system to notice.
+          Same failure as the CDN cache that served a 7-day-old board.json
+          twice, and the same fix: make the artifact state its own age up
+          front. A stale snapshot now announces itself on open. ── */}
+      <div style={{
+        background: "#F6EBD9", border: "1px solid #E2D3B8", borderLeft: "3px solid #6E6657",
+        borderRadius: 6, marginBottom: 12, padding: "8px 12px", ...mono,
+      }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", alignItems: "baseline" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#2B2620" }}>
+            HartnettTracker {TRACKER_VERSION}
+          </span>
+          <span style={{ fontSize: 9, color: "#6E6657" }}>
+            seed {SEED_VERSION}
+          </span>
+          <span style={{ fontSize: 9, color: "#6E6657" }}>
+            {history.length} weeks · latest {history.length ? history[history.length - 1].date : "—"}
+          </span>
+          <span style={{ fontSize: 9, color: "#6E6657" }}>
+            Hull asof {HULL_ASOF_DISPLAY}
+          </span>
+          <span style={{ fontSize: 9, color: "#6E6657" }}>
+            IV asof {IV_ASOF}
+          </span>
+        </div>
+        <div style={{ fontSize: 8.5, color: "#8A8071", marginTop: 3, lineHeight: 1.5 }}>
+          ค่าทั้งหมด spliced ด้วยมือ ไม่ได้ดึงสด — ถ้าตัวเลขข้างบนไม่ตรงกับรอบล่าสุด
+          แปลว่ากำลังดูสแนปช็อตเก่า ให้เจ้าของกด Publish จากเวอร์ชันล่าสุดอีกครั้ง
+        </div>
+      </div>
+
+      {/* ── PUT RADAR PANEL ── */}
+      <div style={{ background: "#F6EBD9", border: "1px solid #F43F5E30", borderRadius: 6, marginBottom: 16, overflow: "hidden" }}>
+        <button onClick={() => setShowPutPanel(!showPutPanel)} style={{
+          width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer",
+          display: "flex", justifyContent: "space-between", alignItems: "center", ...mono,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 9, color: "#F43F5E", letterSpacing: ".15em", fontWeight: 700 }}>▼ PUT RADAR</span>
+            <span style={{ fontSize: 8, color: "#6E6657" }}>{allPutOpps.length} active opportunities · VIX {fmtNum(week.vix, 1)} · P/C {fmtNum(week.pcRatio, 2)}</span>
+            {allPutOpps.filter(a => a.iv.putVerdict === "BUY PUT ★").length > 0 && (
+              <span style={{ fontSize: 8, color: "#F43F5E", background: "rgba(244,63,94,.15)", padding: "2px 7px", borderRadius: 3, border: "1px solid #F43F5E50" }}>
+                ★ {allPutOpps.filter(a => a.iv.putVerdict === "BUY PUT ★").length} HIGH CONVICTION
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: 7, color: "#8A7E68" }}>{showPutPanel ? "▲" : "▼"}</span>
+        </button>
+
+        {showPutPanel && (
+          <div style={{ padding: "0 14px 16px", borderTop: "1px solid #E2D3B8" }}>
+            {(!hasVal(week.vix) || !hasVal(week.pcRatio)) && (
+              <div style={{ marginTop: 12, padding: "8px 11px", background: "rgba(202,138,4,.08)", border: "1px solid #CA8A0440", borderRadius: 4, fontSize: 8, color: "#8A6A1F", lineHeight: 1.6 }}>
+                ⚠ VIX / P-C not in this edition. IV-regime context below is keyed to the carried mark — pull fresh closes for the {week.date.slice(5)} week before sizing. Per protocol, model does not estimate these.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12, marginBottom: 12, padding: "8px 10px", background: "#FFFBF2", borderRadius: 4 }}>
+              <span style={{ fontSize: 7, color: "#8A7E68", marginRight: 4 }}>IV REGIME:</span>
+              {Object.entries(IV_REGIME_STYLE).map(([k, v]) => (
+                <span key={k} style={{ fontSize: 7, color: v.color, fontFamily: "'IBM Plex Mono',monospace" }}>● {k}</span>
+              ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 7, marginBottom: 14 }}>
+              {[
+                {
+                  title: "VIX Environment",
+                  value: !hasVal(week.vix) ? "NO DATA" : week.vix < 16 ? "LOW FEAR" : week.vix < 20 ? "NORMAL" : week.vix < 30 ? "ELEVATED" : "FEAR SPIKE",
+                  detail: !hasVal(week.vix) ? "VIX mark not in this edition. Pull the week's close before trusting put-cost reads." : week.vix < 16 ? "Puts cheap across the board. Best time to build downside protection before volatility picks up." : week.vix < 20 ? "Normal IV environment. Select puts where flow signal aligns." : "IV elevated. Prefer bear spreads to limit premium cost.",
+                  color: !hasVal(week.vix) ? "#B3A78F" : week.vix < 16 ? "#1FB94C" : week.vix < 20 ? "#57534E" : "#CA8A04",
+                },
+                {
+                  title: "P/C Signal",
+                  value: !hasVal(week.pcRatio) ? "NO DATA" : week.pcRatio < 0.42 ? "MAX COMPLACENCY" : week.pcRatio < 0.46 ? "CALL CHASING" : "NEUTRAL",
+                  detail: !hasVal(week.pcRatio) ? "P-C mark not in this edition. Without it, tech sell-signal degrades to REDUCE (not AVOID/PUT) by design — no value is invented." : week.pcRatio < 0.42 ? "Market buying calls not puts. Put skew suppressed. Historically best window to buy protection cheap." : week.pcRatio < 0.46 ? "FOMO mode. Puts relatively cheap vs calls." : "Balanced. Use normal put-buying criteria.",
+                  color: !hasVal(week.pcRatio) ? "#B3A78F" : week.pcRatio < 0.42 ? "#1FB94C" : week.pcRatio < 0.46 ? "#CA8A04" : "#57534E",
+                },
+                {
+                  title: "B&B Risk Level",
+                  value: !hasVal(week.bb) ? "NO DATA" : week.bb >= 8.5 ? "EXTREME GREED" : week.bb >= 8.0 ? "SELL SIGNAL" : week.bb >= 7.0 ? "CAUTION" : "NEUTRAL",
+                  detail: !hasVal(week.bb) ? "B&B not set." : week.bb >= 8.0 ? `B&B=${week.bb.toFixed(1)} — 17 sell signals since '02: avg global-stock loss 2-3% over 2-3 months, ~60% hit ratio, max drawdowns 15-20% (BofA). Reduce frothy longs, add puts.` : week.bb >= 7.0 ? "Approaching sell zone. Pre-position with cheap puts." : "Neutral zone.",
+                  color: !hasVal(week.bb) ? "#B3A78F" : week.bb >= 8.5 ? "#F43F5E" : week.bb >= 8.0 ? "#F97316" : week.bb >= 7.0 ? "#CA8A04" : "#57534E",
+                },
+                {
+                  title: "Optimal Strategy",
+                  value: !hasVal(week.vix) ? "NEED IV MARK" : week.vix < 16 && hasVal(week.bb) && week.bb >= 8.0 ? "OUTRIGHT PUTS" : week.vix >= 20 ? "BEAR SPREADS" : "MIX",
+                  detail: !hasVal(week.vix) ? "Strategy depends on premium level — fill VIX to resolve outright-vs-spread." : week.vix < 16 && hasVal(week.bb) && week.bb >= 8.0 ? "Sweet spot: sell signal + cheap premium. Buy 90-120 DTE OTM puts outright. Don't spread — you want full delta." : week.vix >= 20 ? "Premium too high for outright. Use bear put spreads (buy ATM, sell OTM-5%) to reduce cost by ~40%." : "Selectively outright for highest-conviction signals, spread for others.",
+                  color: !hasVal(week.vix) ? "#B3A78F" : week.vix < 16 && hasVal(week.bb) && week.bb >= 8.0 ? "#F43F5E" : "#CA8A04",
+                },
+              ].map(c => (
+                <div key={c.title} style={{ background: "#FFFBF2", borderRadius: 4, padding: "9px 11px", borderLeft: `2px solid ${c.color}` }}>
+                  <div style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em", marginBottom: 4 }}>{c.title}</div>
+                  <div style={{ fontSize: 12, color: c.color, fontWeight: 700, marginBottom: 4 }}>{c.value}</div>
+                  <div style={{ fontSize: 8, color: "#6E6657", lineHeight: 1.5 }}>{c.detail}</div>
+                </div>
+              ))}
+            </div>
+
+            {allPutOpps.length === 0 ? (
+              <div style={{ padding: "20px", textAlign: "center", color: "#8A7E68", fontSize: 10 }}>No active put opportunities this week.</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 8 }}>
+                {allPutOpps.map(asset => {
+                  const { iv, sig } = asset;
+                  const pvStyle = PUT_VERDICT[iv.putVerdict] || PUT_VERDICT["HOLD OFF"];
+                  const ivStyle = IV_REGIME_STYLE[iv.ivRegime] || IV_REGIME_STYLE["FAIR"];
+                  return (
+                    <div key={asset.id} style={{
+                      background: "#FFFBF2",
+                      border: iv.putVerdict === "BUY PUT ★" ? "1px solid #F43F5E50" : "1px solid #E2D3B8",
+                      borderRadius: 6, padding: "12px 13px",
+                      boxShadow: iv.putVerdict === "BUY PUT ★" ? "0 0 12px rgba(244,63,94,.08)" : "none",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 9 }}>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#000000" }}>{asset.label}</div>
+                          <div style={{ fontSize: 7, color: "#8A7E68", marginTop: 1 }}>{asset.region}{TICKER_MAP[asset.id] && <span> · Hull: {TICKER_MAP[asset.id]}</span>} · <span style={{color:'#B3A78F'}}>{iv.src}</span></div>
+                        </div>
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "3px 9px", borderRadius: 3, background: pvStyle.bg, color: pvStyle.color,
+                          fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, fontWeight: 700,
+                          letterSpacing: ".08em", border: `1px solid ${pvStyle.color}44`,
+                        }}>
+                          {pvStyle.icon} {iv.putVerdict}
+                        </span>
+                      </div>
+                      <IVGauge impliedIV={iv.impliedIV} fairIV={iv.fairIV} putBuy={iv.putBuy} putThresh={iv.putThresh} ivLo={iv.ivLo} ivHi={iv.ivHi} />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, marginTop: 9 }}>
+                        {[
+                          { label: "IMPL IV", value: `${iv.impliedIV.toFixed(1)}%`, color: ivStyle.color },
+                          { label: "52WK MID", value: `${iv.fairIV.toFixed(1)}%`, color: "#6E6657" },
+                          { label: iv.pctEst ? "IV %ILE~" : "IV %ILE", value: `${iv.ivPct52wk}%ile${iv.pctEst ? "~" : ""}${iv.ivStale ? " ⚠" : ""}`, color: iv.ivPct52wk <= 30 ? "#1FB94C" : iv.ivPct52wk >= 75 ? "#F43F5E" : "#57534E" },
+                        ].map(s => (
+                          <div key={s.label} style={{ background: "#F6EBD9", borderRadius: 3, padding: "5px 7px" }}>
+                            <div style={{ fontSize: 6, color: "#8A7E68", marginBottom: 1 }}>{s.label}</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{s.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 7, color: "#8A7E68" }}>REGIME:</span>
+                        <span style={{ fontSize: 8, color: ivStyle.color, fontWeight: 700 }}>{iv.ivRegime}</span>
+                        <span style={{ fontSize: 7, color: "#8A7E68" }}>|</span>
+                        <span style={{ fontSize: 7, color: "#6E6657" }}>{ivStyle.label}</span>
+                      </div>
+                      <div style={{ marginTop: 9, background: "#F6EBD9", borderRadius: 4, padding: "8px 9px" }}>
+                        <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".1em", marginBottom: 6 }}>EXECUTION PARAMS</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+                          {[
+                            { label: "EXPIRY", value: iv.dte },
+                            { label: "STRIKE", value: iv.strike },
+                            { label: "STRUCTURE", value: iv.structure },
+                            { label: "FLOW SIG", value: sig },
+                          ].map(p => (
+                            <div key={p.label}>
+                              <div style={{ fontSize: 6, color: "#8A7E68", marginBottom: 1 }}>{p.label}</div>
+                              <div style={{ fontSize: 8, color: p.label === "FLOW SIG" ? (SIG[p.value] || SIG.NEUTRAL).color : "#1A1A1A", fontWeight: p.label === "FLOW SIG" ? 700 : 400 }}>{p.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 7, fontSize: 7, color: "#6E6657", lineHeight: 1.6, borderTop: "1px solid #E2D3B8", paddingTop: 7 }}>
+                        {iv.putVerdict === "BUY PUT ★" && "★ HIGH CONVICTION: sell signal active + IV suppressed = max asymmetry. Full-size outright put."}
+                        {iv.putVerdict === "BUY PUT"   && "Flow & Hull bearish + IV at or below fair. Good risk/reward on outright put."}
+                        {iv.putVerdict === "SPREAD"    && "Bearish signal but IV elevated. Use bear put spread to halve premium cost."}
+                        {iv.putVerdict === "PREP"      && "Flow turning. IV cheap but no confirmed signal yet. Small starter position or watch."}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Tab + Group bar */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+        {["cards", "history"].map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: "4px 13px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 8,
+            background: tab === t ? "#111111" : "transparent",
+            border: `1px solid ${tab === t ? "#111111" : "#E2D3B8"}`,
+            color: tab === t ? "#fff" : "#5C5546", textTransform: "uppercase",
+          }}>{t === "cards" ? "SIGNAL CARDS" : `${history.length}-WK TABLE`}</button>
+        ))}
+        <div style={{ width: 1, height: 16, background: "#E2D3B8", margin: "0 4px" }} />
+        <span style={{ fontSize: 7, color: "#8A7E68" }}>GROUP:</span>
+        {Object.keys(ASSET_GROUPS).map(g => (
+          <button key={g} onClick={() => setActiveGroup(g)} style={{
+            padding: "3px 9px", borderRadius: 3, cursor: "pointer", ...mono, fontSize: 8,
+            background: activeGroup === g ? "#EFE2CC" : "transparent",
+            border: `1px solid ${activeGroup === g ? "#111111" : "#E2D3B8"}`,
+            color: activeGroup === g ? "#111111" : "#5C5546",
+          }}>{g}</button>
+        ))}
+      </div>
+
+      {/* ── SIGNAL CARDS ── */}
+      {tab === "cards" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 10 }}>
+          {currentAssets.map(asset => {
+            const sig  = computeSignal(asset.id, week);
+            const meta = SIG[sig] || SIG.NEUTRAL;
+            const flow = week.flows[asset.id] ?? null;
+            const hull = week.hullSignals[asset.id] ?? null;
+            const prevFlow = activeWeek > 0 ? (history[activeWeek - 1].flows[asset.id] ?? null) : null;
+            const delta = (prevFlow !== null && flow !== null) ? flow - prevFlow : null;
+            const iv = computeIV(asset.id, week);
+            const pvStyle = PUT_VERDICT[iv.putVerdict] || PUT_VERDICT["HOLD OFF"];
+            const ivStyle = IV_REGIME_STYLE[iv.ivRegime] || IV_REGIME_STYLE["FAIR"];
+
+            return (
+              <div key={asset.id} style={{
+                background: "#F6EBD9",
+                border: `1px solid ${sig === "BUY" ? "#1FB94C40" : sig === "AVOID / PUT" ? "#F43F5E40" : "#E2D3B8"}`,
+                borderRadius: 7, padding: "14px 15px", position: "relative", overflow: "hidden",
+              }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: meta.color, opacity: ["WAIT", "NEUTRAL"].includes(sig) ? .2 : .7 }} />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#000000", marginBottom: 1 }}>{asset.label}</div>
+                    <div style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em" }}>{asset.region}</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                    <Badge signal={sig} />
+                    {iv.putVerdict !== "HOLD OFF" && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 3,
+                        padding: "2px 7px", borderRadius: 3, background: pvStyle.bg, color: pvStyle.color,
+                        fontFamily: "'IBM Plex Mono',monospace", fontSize: 8, fontWeight: 700,
+                        border: `1px solid ${pvStyle.color}33`,
+                      }}>
+                        {pvStyle.icon} {iv.putVerdict}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, marginBottom: 6 }}>
+                  <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
+                    <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>FLOW ({flowUnit(asset.id)})</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: flow === null ? "#B3A78F" : flow >= 0 ? "#1FB94C" : "#F43F5E" }}>
+                      {flow === null ? "—" : (flow >= 0 ? "+" : "") + flow.toFixed(1)}
+                      {flow !== null && isEst(week, asset.id) && <span style={{ fontSize: 8, color: "#CA8A04", marginLeft: 3, verticalAlign: "top" }}>⚠est</span>}
+                    </div>
+                    {delta !== null && (
+                      <div style={{ fontSize: 8, color: delta >= 0 ? "#1FB94C88" : "#F43F5E88", marginTop: 1 }}>
+                        {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
+                    <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>HULL SUITE{TICKER_MAP[asset.id] ? ` \u00b7 ${TICKER_MAP[asset.id]}` : ""}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                      <div style={{ width: 9, height: 9, borderRadius: "50%", background: hull ? HULL_COLOR[hull] : "#D8CCB4", boxShadow: hull ? `0 0 5px ${HULL_COLOR[hull]}` : "none" }} />
+                      <span style={{ fontSize: 9, color: hull ? HULL_COLOR[hull] : "#B3A78F", fontWeight: 700, textTransform: "uppercase" }}>{hull === "green" ? "BULL" : hull === "red" ? "BEAR" : hull === "yellow" ? "FLAT" : "NO READ"}</span>
+                    </div>
+                  </div>
+                  <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
+                    <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>IV (52WK%ILE)</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: ivStyle.color, lineHeight: 1 }}>{hasVal(iv.impliedIV) ? iv.impliedIV.toFixed(1) + "%" : "—"}</div>
+                    <div style={{ fontSize: 7, color: !hasVal(iv.impliedIV) ? "#B3A78F" : iv.ivPct52wk >= 75 ? "#F43F5E" : iv.ivPct52wk <= 30 ? "#1FB94C" : "#57534E", marginTop: 2 }}>
+                      {hasVal(iv.impliedIV) ? `${iv.ivPct52wk}%ile${iv.pctEst ? "~" : ""}${iv.ivStale ? " ⚠" : ""} · ${iv.ivRegime}` : "no IV data"}
+                    </div>
+                    {hasVal(iv.impliedIV) && <div style={{ fontSize: 6, color: iv.stale ? "#CA8A04" : "#B3A78F", marginTop: 2, lineHeight: 1.3 }}>{iv.src}</div>}
+                  </div>
+                </div>
+
+                {hasVal(iv.impliedIV)
+                  ? <IVGauge impliedIV={iv.impliedIV} fairIV={iv.fairIV} putBuy={iv.putBuy} putThresh={iv.putThresh} ivLo={iv.ivLo} ivHi={iv.ivHi} />
+                  : <div style={{ marginTop: 10, padding: "6px 8px", background: "#FFFBF2", borderRadius: 4, fontSize: 7, color: "#B3A78F", letterSpacing: ".05em" }}>○ NO IV DATA — {iv.src}</div>}
+
+                {iv.putVerdict !== "HOLD OFF" && (
+                  <div style={{ marginTop: 8, background: "#FFFBF2", borderRadius: 4, padding: "6px 8px", borderLeft: `2px solid ${pvStyle.color}` }}>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 7, color: "#8A7E68" }}>EXPIRY: <span style={{ color: "#1A1A1A" }}>{iv.dte}</span></span>
+                      <span style={{ fontSize: 7, color: "#8A7E68" }}>STRIKE: <span style={{ color: "#1A1A1A" }}>{iv.strike}</span></span>
+                      <span style={{ fontSize: 7, color: "#8A7E68" }}>TYPE: <span style={{ color: pvStyle.color }}>{iv.structure}</span></span>
+                    </div>
+                  </div>
+                )}
+
+                <MiniBarChart history={history} assetId={asset.id} />
+                <SignalTrail history={history} assetId={asset.id} />
+
+                <div style={{ marginTop: 8, fontSize: 8, color: "#6E6657", lineHeight: 1.5 }}>
+                  {sig === "BUY"         && "✓ Flow + Hull aligned — Entry zone"}
+                  {sig === "WATCH"       && "◈ Flow turning — Wait for Hull confirm"}
+                  {sig === "WAIT"        && "○ Outflow ongoing — Not yet threshold"}
+                  {sig === "AVOID / PUT" && "▼ Extreme inflow + sell signal — PUT hedge"}
+                  {sig === "REDUCE"      && "↓ Sell signal active — Reduce exposure"}
+                  {sig === "HOLD"        && "■ Momentum intact — Hold position"}
+                  {sig === "NEUTRAL"     && "— No clear directional bias"}
+                  {sig === "NO DATA"     && "∅ No documented flow this week — null, not zero; excluded from signal"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── N-WEEK TABLE ── */}
+      {tab === "history" && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, ...mono }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #E2D3B8" }}>
+                <th style={{ textAlign: "left", padding: "7px 10px", color: "#8A7E68", fontSize: 7, fontWeight: 600 }}>ASSET</th>
+                {history.map((w, i) => (
+                  <th key={i} style={{ textAlign: "center", padding: "7px 6px", color: i === lastIdx ? "#111111" : "#8A7E68", fontSize: 7, fontWeight: i === lastIdx ? 700 : 400, whiteSpace: "nowrap" }}>
+                    {i === lastIdx ? "★ " : ""}{w.date.slice(5)}
+                    <div style={{ fontSize: 6, color: "#B3A78F", marginTop: 1 }}>{titleOf(w, i)}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {currentAssets.map(asset => (
+                <tr key={asset.id} style={{ borderBottom: "1px solid #E2D3B822" }}>
+                  <td style={{ padding: "6px 10px", color: "#5C5546", fontSize: 8, whiteSpace: "nowrap" }}>
+                    {asset.label}
+                    {PCT_AUM_ASSETS.has(asset.id) && <span style={{color:"#B3A78F",fontSize:6,marginLeft:3}}>%AUM</span>}
+                  </td>
+                  {history.map((w, i) => {
+                    const sig  = computeSignal(asset.id, w);
+                    const flow = w.flows[asset.id] ?? null;
+                    const iv   = computeIV(asset.id, w);
+                    const pvStyle = PUT_VERDICT[iv.putVerdict] || null;
+                    const prevFlow = i > 0 ? (history[i - 1].flows[asset.id] ?? null) : null;
+                    const delta = (prevFlow !== null && flow !== null) ? flow - prevFlow : null;
+                    return (
+                      <td key={i} style={{ padding: "5px 6px", textAlign: "center", background: i === activeWeek ? "#11111108" : "transparent" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                          <Badge signal={sig} />
+                          {pvStyle && iv.putVerdict !== "HOLD OFF" && (
+                            <span style={{ fontSize: 7, color: pvStyle.color, fontFamily: "'IBM Plex Mono',monospace" }}>{pvStyle.icon}</span>
+                          )}
+                          <span style={{ fontSize: 9, color: flow === null ? "#B3A78F" : flow >= 0 ? "#1FB94C" : "#F43F5E" }}>
+                            {flow === null ? "—" : (flow >= 0 ? "+" : "") + flow.toFixed(1)}{flow !== null && isEst(w, asset.id) ? "⚠" : ""}
+                          </span>
+                          <span style={{ fontSize: 7, color: (IV_REGIME_STYLE[iv.ivRegime] || {}).color || "#6E6657" }}>
+                            {hasVal(iv.impliedIV) ? iv.impliedIV.toFixed(0) + "%" : "—"}
+                          </span>
+                          {delta !== null && (
+                            <span style={{ fontSize: 7, color: delta >= 0 ? "#1FB94C66" : "#F43F5E66" }}>
+                              {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              <tr style={{ borderTop: "2px solid #E2D3B8" }}>
+                <td style={{ padding: "6px 10px", color: "#8A7E68", fontSize: 7 }}>Bull & Bear</td>
+                {history.map((w, i) => (
+                  <td key={i} style={{ textAlign: "center", padding: "6px 6px", color: hasVal(w.bb) && w.bb >= 8 ? "#F43F5E" : hasVal(w.bb) && w.bb <= 2 ? "#1FB94C" : "#57534E", fontSize: 10, fontWeight: 700 }}>
+                    {fmtNum(w.bb, 1)}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td style={{ padding: "6px 10px", color: "#8A7E68", fontSize: 7 }}>FMS Cash</td>
+                {history.map((w, i) => (
+                  <td key={i} style={{ textAlign: "center", padding: "6px 6px", color: hasVal(w.cashLevel) && w.cashLevel < 4 ? "#F43F5E" : "#57534E", fontSize: 9 }}>
+                    {fmtNum(w.cashLevel, 1, "%")}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Playbook — seed edition (wk11). Update via structural regen only if you want it week-fresh. */}
+      <div style={{ marginTop: 22, background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 6, padding: "13px 15px" }}>
+        <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginBottom: 10 }}>HARTNETT PLAYBOOK (AUG 20 · WK ENDED 08/19) · "STEEL CAGE MATCH...BESSENT vs ABB" · B&B BACK UP TO 9.5 · FIRST EXPLICIT SHORT IN FIVE EDITIONS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(168px,1fr))", gap: 7 }}>
+          {[
+            { theme: "★ B&B reverses UP to 9.5", play: "9.3 -> 9.5 on stronger breadth and bullish positioning in S&P500 AND GOLD FUTURES. BofA positioning reads 'extreme bull'. Last week's decline did not continue. ⚠️ His scorecard for the SAME signal shrank in one week: SPX since 26 May now +1.6% (he printed +4% last week), ACWI +1.3% (was +3%). That is a restatement, not a market move — trust the base rate, not the weekly number", color: "#F43F5E" },
+            { theme: "★ Short financials — first named short", play: "'Contrarian US midterms trade...we hedge via short financials', and in the failure case 'short cyclicals (financials) into midterms'. FLOW AGREES: financials -$2.0bn, biggest outflow in 11 weeks, and private clients are selling financial ETFs. PRICE DOES NOT: XLF Hull weekly +0.94, the strongest sector on the board", color: "#F43F5E" },
+            { theme: "★ USD question answered in print", play: "wk18 was ambiguous and this tracker CARRIED the wk17 long-USD call rather than infer a reversal. wk19 states it: 'secular consensus is ABD Anything but the Dollar; WE AGREE'. The carried long-USD call is now SUPERSEDED by an explicit statement, not by inference. He still never says 'short dollar' — the trade he names is long gold. Dollar YTD has faded +1.7% -> +0.6% over three weeks", color: "#CA8A04" },
+            { theme: "Gold: 3D flips green, weekly still red", play: "GLD 3D -0.19 -> +0.22 and GLTR 3D -0.44 -> +0.04, while weeklies stay red (GLD -0.90, GLTR -1.34). Weekly improving three weeks straight: -1.42 -> -1.22 -> -0.90. Flow +$3.8bn, 7th straight week. Gold YTD -2.3% -> +1.0% -> +4.0%. ⚠️ BUT GVZ jumped 34.9 -> 67.5%ile in one week — gold vol is no longer cheap, so a vol-timed entry window has closed even as price improves", color: "#CA8A04" },
+            { theme: "Bessent puts = quasi-QE", play: "USD swap lines with Asia/Gulf, yen FX intervention, now DOUBLING long-bond buybacks with Fed acquiescence. Trigger: debt just crossed $40tn, $2tn net UST issuance in '26-'27, hyperscaler bonds now 9% of gross IG supply (1% in '24). His call: this CAPS but does not REDUCE yields. Failure case is explicit — if the 30Y will not go below 5%: dollar slump, short risk, short leverage (AI hyperscalers, private credit), short financials", color: "#6E6657" },
+            { theme: "Tail hedging woke up", play: "SKEW 138 -> 143.9, and 9.1%ile -> 46.8%ile in ONE WEEK — the largest percentile move on the vol board. VIX 14.25 -> 15.13 (2.8 -> 11.9%ile). VVIX still 4.0%ile. The index barely moved; someone is buying protection anyway", color: "#CA8A04" },
+          ].map((r, idx) => (
+            <div key={idx} style={{ background: "#FFFBF2", borderRadius: 4, padding: "6px 8px", borderLeft: `2px solid ${r.color}` }}>
+              <div style={{ fontSize: 7, color: r.color, fontWeight: 700, marginBottom: 2 }}>{r.theme}</div>
+              <div style={{ fontSize: 8, color: "#5C5546" }}>{r.play}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Catalysts calendar */}
+      <div style={{ marginTop: 10, background: "#F6EBD9", border: "1px solid #CA8A0430", borderRadius: 6, padding: "13px 15px" }}>
+        <div style={{ fontSize: 7, color: "#CA8A04", letterSpacing: ".15em", marginBottom: 10 }}>ROAD MAP — HIS OWN PRINTED CALENDAR (Aug 20 edition) · NOTE: all probabilities are HIKE, not cut</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 7 }}>
+          {[
+            { date: "Aug 18", event: "August FMS — RELEASED, cash level STILL NOT PRINTED", risk: "⚠️ He cites 'Aug FMS' twice in this edition (Chart 3 midterm expectations, Chart 4 DEM-sweep reaction) so he has read the survey — but he does NOT print the cash level or the equity-allocation number. cashLevel therefore stays CARRIED at 3.6% for a sixth edition. The wk18 pre-registered read (cash below 3.6% + equity >52% OW = take profits) is UNRESOLVED, not answered. Do not infer it from the charts he did show", color: "#F43F5E" },
+            { date: "Aug 28 · 10am", event: "Warsh · Jackson Hole + BLS payroll revisions SAME HOUR", risk: "He needs Warsh 'just-hawkish-enough' to restore bond credibility WITHOUT torpedoing the dollar. Two market-moving releases in the same minute — the nearest live catalyst by far", color: "#F43F5E" },
+            { date: "Sep 4 / 16 / 18", event: "Payrolls · FOMC 35% · BoJ 74%", risk: "He now says the yen intervention 'needs to be backed up with meaningful BoJ rate hike on Sep 18th' to steady the JGB long end. The BoJ number is the highest on his calendar and the least discussed", color: "#CA8A04" },
+            { date: "Sep 24", event: "Trump-Xi summit", risk: "China's -2.1% collapse did not continue (-0.1% this week). He is still long HK property against the consensus. Summit is the event that resolves it", color: "#CA8A04" },
+            { date: "Oct 4", event: "Brazil election — Lula vs Bolsonaro", risk: "Brazil Wk %AUM -1.1%, negative a SECOND straight week and again the worst line on the table. EWZ Hull -0.72 weekly / -0.54 3D, no improvement. VXEWZ still stale at 7/17 = 35 days old with six weeks to the vote and no current IV read", color: "#F43F5E" },
+            { date: "Oct 28 / Nov 3", event: "FOMC 55% hike · US midterms", risk: "Aug FMS consensus: 56% expect DEM House / GOP Senate, only 28% a DEM sweep. He fades it via short financials. If DEMs take Senate AND GOP loses TX: stocks -10%+, dollar and yields down into year-end. Trump approval 39% overall, 36% economy, 30% inflation — all below pre-war averages", color: "#F43F5E" },
+            { date: "ongoing", event: "Maginot Lines · $4 gas · 160 JPY · 5% UST", risk: "Gasoline is ALREADY back above $4 with SPR at a 44-year low and crude days-of-supply at 40-50 year lows — the hardest line to hold. 5% on the 30Y is what he calls 'the Big One'. He nominates PSP (Private Equity ETF) as the tell for policy failure; PSP is NOT in the ticker universe, so there is no Hull read on his own failure gauge", color: "#6E6657" },
+          ].map(r => (
+            <div key={r.date + r.event} style={{ background: "#FFFBF2", borderRadius: 4, padding: "6px 8px", borderLeft: `2px solid ${r.color}` }}>
+              <div style={{ fontSize: 9, color: r.color, fontWeight: 700, marginBottom: 2 }}>{r.date} · {r.event}</div>
+              <div style={{ fontSize: 7, color: "#6E6657", lineHeight: 1.5 }}>{r.risk}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Lag reference */}
+      <div style={{ marginTop: 10, background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 6, padding: "13px 15px" }}>
+        <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginBottom: 10 }}>LAG: FLOW → PRICE REVERSAL</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 7 }}>
+          {[
+            { asset: "Global Equities", lag: "6–12 wks", rule: ">1% AUM outflow" },
+            { asset: "EM Equities",     lag: "4–8 wks",  rule: ">3% AUM outflow" },
+            { asset: "Gold",            lag: "2–4 wks",  rule: "Extreme inflow = top" },
+            { asset: "HY Bonds",        lag: "4–6 wks",  rule: "Outflow 3+ wks" },
+            { asset: "Crypto",          lag: "1–3 wks",  rule: "Panic outflow" },
+            { asset: "Bull & Bear ≥8",  lag: "8–12 wks", rule: "17 signals since 2002" },
+          ].map(r => (
+            <div key={r.asset} style={{ background: "#FFFBF2", borderRadius: 4, padding: "6px 8px" }}>
+              <div style={{ fontSize: 8, color: "#1A1A1A", fontWeight: 600, marginBottom: 2 }}>{r.asset}</div>
+              <div style={{ fontSize: 10, color: "#111111" }}>{r.lag}</div>
+              <div style={{ fontSize: 7, color: "#8A7E68", marginTop: 1 }}>{r.rule}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 7, color: "#E2D3B8", textAlign: "center", letterSpacing: ".08em" }}>
+        HARTNETT TRACKER WITH PUT {TRACKER_VERSION} (CREAM · NULL-AWARE · IMPORT WEEK) · SEED {history[0].date} – {history[lastIdx].date} ({history.length} WK) · WEEKLY UPDATES = SEED-SPLICE + COMPILE GATE (REV 1.2) · IMPORT WEEK = MID-WEEK FALLBACK · BUILD {SEED_VERSION} · FOR INFORMATIONAL USE ONLY
+      </div>
+    </div>
+  );
+}
+
+
+// Fail loudly and visibly. A blank page is the one outcome that would put us
+// back to guessing, which is exactly what this file exists to end.
+try {
+  document.getElementById("boot").remove();
+  ReactDOM.createRoot(document.getElementById("root"))
+    .render(React.createElement(HartnettTrackerPutV2));
+} catch (e) {
+  const b = document.getElementById("boot");
+  if (b) b.remove();
+  const box = document.getElementById("err");
+  box.style.display = "block";
+  box.textContent = "RENDER FAILED\n\n" + (e && e.stack ? e.stack : String(e));
+}
+</script>
+
+<script>
+// Catch transpile-time failures too — those never reach the try/catch above.
+window.addEventListener("error", function (ev) {
+  var b = document.getElementById("boot");
+  if (b) b.remove();
+  var box = document.getElementById("err");
+  if (box && box.style.display !== "block") {
+    box.style.display = "block";
+    box.textContent = "LOAD FAILED\n\n" + (ev.message || "") + "\n" + (ev.filename || "");
+  }
+});
+</script>
+</body>
+</html>

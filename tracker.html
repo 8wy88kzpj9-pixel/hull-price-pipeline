@@ -5,34 +5,36 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Hartnett Tracker</title>
 <!--
-  STANDALONE BUILD — served from GitHub Pages, not from a Claude artifact.
+  STANDALONE BUILD — served from GitHub Pages. Fixed URL, updated by commit.
 
   WHY THIS FILE EXISTS
-  A published Claude artifact serves the card it was published FROM. Every time
-  the tracker was rewritten it became a new card, so the shared link kept
-  serving v2.7.0 while the chat showed the current build. Three rounds of
-  re-publishing did not fix it because the link was bound to the old card.
-  Here the URL is fixed and the content is whatever is committed to the repo —
-  the same property that made board.json trustworthy once we stopped reading it
-  through a CDN cache. Update = commit. There is no publish step to go stale.
+  A published Claude artifact serves the card it was published FROM. Each
+  rewrite created a new card, so the shared link kept serving v2.7.0 while the
+  chat showed the current build. Re-publishing could not fix it. Here the URL
+  is fixed and the content is whatever is committed — the same property that
+  made board.json trustworthy once we stopped reading it through a CDN cache.
+
+  FIX LOG
+  v1 of this wrapper used <script type="text/babel" data-type="module">. That
+  told Babel to emit ESM, so preset-react used the AUTOMATIC jsx runtime and
+  produced `import ... from "react/jsx-runtime"` — a bare specifier no browser
+  can resolve without a bundler. It failed with:
+      TypeError: Module name, 'react/jsx-runtime' does not resolve to a valid URL
+  v2 stops guessing at Babel's defaults. The JSX is parked in a text/plain
+  block the browser will not execute, then transformed explicitly with
+  {runtime: "classic"} so the output is React.createElement calls against the
+  UMD global. Pinning behaviour beats relying on a default that changed
+  between Babel 7 and 8.
 
   DEPLOY
-    1. commit this file as  docs/tracker.html   (or  tracker.html  at the repo
-       root if Pages is serving from the root — match wherever data/board.json
-       is being served from today)
-    2. open  https://8wy88kzpj9-pixel.github.io/hull-price-pipeline/tracker.html
-    3. send that URL once. It never changes again.
-
-  NOTE ON BABEL
-  JSX is transpiled in the browser by @babel/standalone. That costs roughly a
-  second on first paint for a file this size and is the price of keeping ONE
-  source of truth — the same .jsx that is compile-gated here also runs there,
-  with no build step to drift out of sync. If first paint ever gets annoying,
-  the fix is a real build step, not a hand-maintained second copy.
+    commit as  tracker.html  at the repo ROOT (same level as the data/ folder —
+    data/board.json already proves Pages serves from there), then open
+    https://8wy88kzpj9-pixel.github.io/hull-price-pipeline/tracker.html
+    First visit after a change may need ?v=2 to defeat the CDN 404/HTML cache.
 -->
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
 <style>
   html,body{margin:0;padding:0;background:#FBFAF7;-webkit-text-size-adjust:100%}
   #boot{padding:24px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:#6E6657}
@@ -45,7 +47,8 @@
 <div id="err"></div>
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react" data-type="module">
+<!-- text/plain: the browser will not run this. Babel reads it as text. -->
+<script type="text/plain" id="jsx-source">
 const { useState, useEffect, useCallback } = React;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2355,31 +2358,63 @@ function HartnettTrackerPutV2() {
   );
 }
 
-
-// Fail loudly and visibly. A blank page is the one outcome that would put us
-// back to guessing, which is exactly what this file exists to end.
-try {
-  document.getElementById("boot").remove();
-  ReactDOM.createRoot(document.getElementById("root"))
-    .render(React.createElement(HartnettTrackerPutV2));
-} catch (e) {
-  const b = document.getElementById("boot");
-  if (b) b.remove();
-  const box = document.getElementById("err");
-  box.style.display = "block";
-  box.textContent = "RENDER FAILED\n\n" + (e && e.stack ? e.stack : String(e));
-}
 </script>
 
 <script>
-// Catch transpile-time failures too — those never reach the try/catch above.
+(function () {
+  function fail(label, e) {
+    var b = document.getElementById("boot");
+    if (b) b.remove();
+    var box = document.getElementById("err");
+    box.style.display = "block";
+    box.textContent = label + "\n\n" + (e && e.stack ? e.stack : String(e));
+  }
+  try {
+    if (!window.React || !window.ReactDOM) throw new Error("React UMD did not load (network/CDN blocked?)");
+    if (!window.Babel) throw new Error("Babel standalone did not load (network/CDN blocked?)");
+
+    // ⚠️ Append an EXPLICIT global handoff before transforming.
+    // Indirect eval puts top-level declarations in the global LEXICAL scope,
+    // which is not the same thing as a property of window. Verified locally:
+    // inside the eval `typeof HartnettTrackerPutV2` is "function", outside it
+    // is undefined on globalThis. Whether the bare name still resolves in the
+    // enclosing script is engine-dependent — exactly the kind of default this
+    // wrapper already got burned by once. So don't rely on it: hand the
+    // component over by assignment, from inside the eval where the binding is
+    // guaranteed visible.
+    var src = document.getElementById("jsx-source").textContent
+            + "\n;globalThis.__TRACKER_COMPONENT__ = HartnettTrackerPutV2;";
+
+    // runtime:"classic" is the whole point — it emits React.createElement
+    // against the UMD global instead of importing react/jsx-runtime.
+    var out = Babel.transform(src, {
+      presets: [["react", { runtime: "classic" }]],
+      sourceType: "script"
+    }).code;
+
+    // Indirect eval keeps the transpiled declarations out of this closure but
+    // still in global scope, so the component is reachable below.
+    (0, eval)(out);
+
+    var Component = globalThis.__TRACKER_COMPONENT__;
+    if (typeof Component !== "function") {
+      throw new Error("component handoff failed — __TRACKER_COMPONENT__ is " + typeof Component);
+    }
+    document.getElementById("boot").remove();
+    ReactDOM.createRoot(document.getElementById("root"))
+      .render(React.createElement(Component));
+  } catch (e) {
+    fail("LOAD FAILED", e);
+  }
+})();
+
+// Anything that escapes the block above still surfaces rather than blanking.
 window.addEventListener("error", function (ev) {
-  var b = document.getElementById("boot");
-  if (b) b.remove();
   var box = document.getElementById("err");
   if (box && box.style.display !== "block") {
+    var b = document.getElementById("boot"); if (b) b.remove();
     box.style.display = "block";
-    box.textContent = "LOAD FAILED\n\n" + (ev.message || "") + "\n" + (ev.filename || "");
+    box.textContent = "RUNTIME ERROR\n\n" + (ev.message || "") + "\n" + (ev.filename || "");
   }
 });
 </script>

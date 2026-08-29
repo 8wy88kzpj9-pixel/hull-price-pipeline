@@ -215,7 +215,7 @@ const { useState, useEffect, useCallback } = React;
 // Bump BOTH when shipping: TRACKER_VERSION is what a viewer sees on the
 // banner, SEED_VERSION is what the load gate compares. They answer
 // different questions and must not be collapsed into one string.
-const TRACKER_VERSION = "v2.10.0";
+const TRACKER_VERSION = "v2.13.0";
 const HULL_ASOF_DISPLAY = "2026-08-21";
 const SEED_VERSION = "2.9.0-wk19-0823"; // wk18 "Strife Begins at Forty" spliced 2026-08-16 (Flow Show 13 Aug edition, EPFR wk ended 8/12); IV_DATA re-spliced same day. SEED CONTENT CHANGED -> bump is REQUIRED: the strict-equality gate below orphans 2.6.0 saves so the new week is actually served. // wk14 "Fade Runner" spliced 2026-07-19 (Flow Show 7/17 edition) // v2.1: wk12 baked into seed (rev 1.2 seed-splice workflow). NOTE: strict-equality load gate below intentionally orphans v2.0 saves — fresh instances start empty anyway; patch replay is the recovery path.
 const STORAGE_KEY  = "hartnettPutV2_0"; // bumped: payload shape changed (added dataVersion)
@@ -1258,6 +1258,102 @@ const SEEDED_HISTORY = [
   },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LADDER v2 — the operator's own entry/exit legs. NOT Hartnett's view.
+//
+// ⚠️ NAMING: the label "ไม้" has now carried THREE different definitions —
+// ops rev1.3 (ribbon reclaim), the F1/F2/F3 rewrite, and this one. Reusing the
+// old label for new rules is the exact collision that cost this system its vol
+// history and its put/call series. The label is kept because the operator asked
+// for it, so the version tag does the disambiguating instead: any log entry
+// must read "ไม้ v2", never bare "ไม้". If these rules change again, the tag
+// increments — the definitions live here and nowhere else.
+//
+//   ENTRY                                   EXIT
+//   ไม้1  Hull 3D เขียว                      3D แดง · หรือ flow ออกครบหน้าต่าง
+//   ไม้2  flow เข้าครบหน้าต่าง                flow ออกครบหน้าต่าง
+//   ไม้3  Hull weekly เขียว                  flow ออกครบหน้าต่าง
+//
+// VERSION TRAIL — read before changing any of this again:
+//   v2   (2026-08-24) three independent legs; exits = 3D red (leg1) and
+//        flow-out over the window (all legs). Window 3wk, crypto 2wk.
+//   v2.1 (same day) weekly-red added as a global exit at operator request.
+//        REVERTED within the hour: it made ไม้1 structurally unable to fire
+//        while weekly was red — which is the one setup ไม้1 exists to catch.
+//        Gold was the proof: 3D green + flow in 3wk + weekly -0.90 read as
+//        all-legs-out, hiding the fast layer turning first.
+//   v2.2 (current) back to the v2 exits. weekly red does NOT close any leg.
+//        Weekly still shows in the tile above and still drives ไม้3 entry, so
+//        a red weekly is visible without silently voiding the fast legs.
+// The lesson is kept here rather than deleted: a rule that was tried and
+// rejected is worth more in the file than in nobody memory.
+//
+// หน้าต่าง flow = 3 สัปดาห์ · ยกเว้น crypto = 2 สัปดาห์ (BTC หมุนเร็วกว่า)
+//
+// Legs are INDEPENDENT — leg 2 does not require leg 1. Exits are evaluated
+// before entries, so a leg that meets both conditions reads OUT.
+// Tri-state on purpose: "in" | "out" | null. null means an input was not
+// sourced and is NEVER shown as "out" — the whole point of this session.
+const LADDER_TAG = "v2.2";
+const flowWindow = (assetId) => (assetId === "crypto" ? 2 : 3);
+
+function computeLadder(assetId, hist) {
+  const n = hist.length;
+  if (!n) return { legs: [null, null, null], win: 3, flows: [], exitAll: false };
+  const w = hist[n - 1];
+  const win = flowWindow(assetId);
+
+  const flows = [];
+  for (let i = n - win; i < n; i++) flows.push(i >= 0 ? (hist[i].flows?.[assetId] ?? null) : null);
+  const known = flows.length === win && flows.every((v) => hasVal(v));
+  const inAll = known && flows.every((v) => v > 0);
+  const outAll = known && flows.every((v) => v < 0);
+
+  const h3 = w.hull3dSignals ? (w.hull3dSignals[assetId] ?? null) : null;
+  const hw = w.hullSignals?.[assetId] ?? null;
+
+  // exit first, always. Weekly red is NOT an exit (see v2.1 in the trail above).
+  const leg1 = h3 === null ? null
+    : (h3 === "red" || outAll) ? "out"
+    : (h3 === "green" ? "in" : "out");
+  const leg2 = !known ? null : outAll ? "out" : (inAll ? "in" : "out");
+  const leg3 = hw === null ? null : outAll ? "out" : (hw === "green" ? "in" : "out");
+
+  return { legs: [leg1, leg2, leg3], win, flows, exitAll: outAll };
+}
+
+// Three dots. Hollow = not sourced. This block is deliberately rendered inside
+// the Hull tile and labelled as the operator's own, so it is never read as part
+// of the Hartnett verdict badge above it.
+function LadderDots({ ladder }) {
+  const L = ["1", "2", "3"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5 }}>
+      <span style={{ fontSize: 6.5, color: "#8A7E68", letterSpacing: ".08em" }}>
+        ไม้ {LADDER_TAG}
+      </span>
+      {ladder.legs.map((st, i) => (
+        <div key={L[i]} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: st === "in" ? "#1FB94C" : st === "out" ? "#E4DAC6" : "transparent",
+            border: st === null ? "1px dashed #C4B79C" : "none",
+            boxShadow: st === "in" ? "0 0 5px #1FB94C" : "none",
+          }} />
+          <span style={{
+            fontSize: 7,
+            color: st === "in" ? "#1FB94C" : st === null ? "#B3A78F" : "#A3987F",
+            fontWeight: st === "in" ? 700 : 400,
+          }}>{L[i]}</span>
+        </div>
+      ))}
+      <span style={{ fontSize: 6, color: ladder.exitAll ? "#B3261E" : "#B3A78F" }}>
+        flow {ladder.win}w{ladder.exitAll ? " · EXIT flow" : ""}
+      </span>
+    </div>
+  );
+}
+
 function computeSignal(assetId, w) {
   const { flows, hullSignals, bb, pcRatio, emOutflow4wk } = w;
   if (flows[assetId] === null || flows[assetId] === undefined) return "NO DATA";
@@ -1269,8 +1365,18 @@ function computeSignal(assetId, w) {
   const emHi = hasVal(emOutflow4wk) && emOutflow4wk >= 3.0; // v2.3: aligned to documented EM Flow Trading Rule (buy when 4wk outflow >= 3% AUM)
 
   if (["hk", "em", "thailand", "em_total"].includes(assetId)) {
-    if (hull === "green" && emHi) return "BUY";
-    if (flow < 0 && emHi) return "WATCH";
+    if (emRuleActive(w.date)) {
+      // Rule is live. If BofA has not printed the number, say so — do NOT let
+      // an unevaluable rule masquerade as a market verdict.
+      if (!hasVal(emOutflow4wk)) return "NO RULE DATA";
+      if (hull === "green" && emHi) return "BUY";
+      if (flow < 0 && emHi) return "WATCH";
+      return "WAIT";
+    }
+    // Rule expired -> same treatment as the other EM legs, nothing special.
+    if (hull === "red") return "WAIT";
+    if (hull === "green" && flow > 0) return "BUY";
+    if (hull === "green") return "WATCH";
     return "WAIT";
   }
   if (["em_brazil", "em_india", "em_china"].includes(assetId)) {
@@ -1454,6 +1560,188 @@ function HullLeg({ label, c }) {
       <span style={{ fontSize: 8.5, color: col, fontWeight: 700, textTransform: "uppercase" }}>
         {c === "green" ? "BULL" : c === "red" ? "BEAR" : c === "yellow" ? "FLAT" : "NO READ"}
       </span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EM FLOW TRADING RULE — now DATED. Previously it gated the EM branch forever
+// because the gate was written as "is emOutflow4wk >= 3.0", and emOutflow4wk
+// has been null since wk16. A null made emHi false, which silently sent em /
+// em_total / hk / thailand to WAIT on every single week — not because the
+// market said wait, but because the rule could not evaluate. Five editions of
+// "WAIT" that meant "no input".
+//
+// BofA states a signal LIFE for every Rules & Tools line. This one is 8 weeks
+// from the 2026-07-23 reading, so it dies on its own. Encode that: after the
+// expiry the rule is simply gone and the asset falls through to the ordinary
+// hull+flow logic. A rule with a stated life that never expires is not the
+// rule BofA published.
+const EM_RULE = {
+  read: 2.2,                  // % AUM, 4wk INflow as printed
+  signal: "Sell",
+  firedAsOf: "2026-07-23",    // the reading's own date, not the splice date
+  lifeWeeks: 8,               // per the published Rules & Tools line
+  expires: "2026-09-17",      // firedAsOf + 8 weeks
+};
+const emRuleActive = (weekDate) =>
+  !!weekDate && weekDate >= EM_RULE.firedAsOf && weekDate < EM_RULE.expires;
+const emRuleWeek = (weekDate) => {
+  if (!weekDate) return null;
+  const d = Math.round((Date.parse(weekDate) - Date.parse(EM_RULE.firedAsOf)) / 604800000);
+  return Math.min(EM_RULE.lifeWeeks, Math.max(1, d + 1));
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HARTNETT CALLS — what he actually recommended, per edition.
+//
+// This is the ONLY thing the headline badge shows now. Not computed, not
+// blended, not inferred. If an edition does not name an asset, the badge says
+// so rather than manufacturing an opinion — the operator ladder already gives
+// the mechanical read, so there is nothing for a rule engine to add up here.
+//
+// SOURCING RULES, same as everywhere else in this file:
+//   · a call is entered only if the edition NAMES it. "preferred longs: gold
+//     (obvs), and unloved long duration REITs/XBI/regional banks/small cap/HK
+//     property" is five named calls — not licence to infer a sixth.
+//   · themes he names that have NO asset in this universe go in `unmapped` and
+//     are shown on screen, so a call is never silently dropped for want of a proxy.
+//   · a call CARRIES until a later edition changes it. Absence from one week is
+//     not withdrawal — that lesson cost a full retraction at wk18.
+//   · ticker mapping is OURS. hk = EWH is broad Hong Kong; he said Hong Kong
+//     PROPERTY (HSP). Flagged inline, never quietly equated.
+const HARTNETT_CALLS = {
+  // ⚠️ CORRECTION 2026-08-24 (operator-flagged). The first version of this table
+  // read too generously and had to be cut back. Two specific over-reads:
+  //
+  //   ustech / sec_tech = LONG, sourced from wk18's "optimal bubble strategy
+  //   remains long \u201chubris\u201d (AI)". That is a FRAMING sentence about how
+  //   bubbles are optimally played, with hubris in scare quotes, inside a
+  //   paragraph whose actual instruction is "we say trade is SHORT AI bonds".
+  //   wk19 removes all doubt: "secular consensus is long AI" — long AI is the
+  //   crowd he is fading, and his own move is to short the bonds and barbell
+  //   the equity exposure. He never told anyone to buy AI stocks.
+  //
+  //   sec_consumer / china_stocks / em_china = LONG, sourced from "long
+  //   \u201chumiliation\u201d ... we think most likely consumer, China next few
+  //   quarters". "We think most likely" is a FORECAST of where the humiliation
+  //   trade will show up. It is not "we are long it now".
+  //
+  // TEST APPLIED FROM HERE ON: a call is entered only where he speaks in the
+  // first person about a position — "we long", "we say trade is", "preferred
+  // longs", "we hedge via". Descriptions of what the market is doing, scare
+  // quotes, comparatives ("less vulnerable than banks") and forecasts are
+  // recorded under `mentions` and are NOT calls. His late-summer register is
+  // heavily ironic; anything read tonally rather than literally is a mis-read
+  // waiting to happen.
+  "2026-08-07": {
+    edition: "6 Aug 2026 · Poor man's LTCM, rich man's YCC",
+    calls: {
+      sec_realestate: { side: "LONG", note: "\u201crotate into...duration (e.g. REITs)\u201d" },
+      us_smallcap:    { side: "LONG", note: "\u201cduration (e.g. REITs, small cap, biotech)\u201d" },
+      gold:           { side: "LONG", note: "\u201cwe long gold to hedge a K-shape electorate\u201d" },
+      sec_consumer:   { side: "LONG", note: "\u201clong consumer stocks best play for Trump needed pivot to affordability\u201d" },
+      sox:            { side: "VIEW \u2212", note: "named with banks and industrials as MORE cyclically vulnerable to \u201cno landing / no hike / no AI capex cut / no DEM sweep\u201d disappointment \u2014 a comparative, not a stated short" },
+    },
+    unmapped: ["staples (XLP)", "biotech (XBI)", "US dollar (UUP)"],
+    mentions: ["banks and industrials also named vulnerable — no asset id maps cleanly to either"],
+  },
+  "2026-08-14": {
+    edition: "13 Aug 2026 · Strife Begins at Forty",
+    calls: {
+      sec_realestate: { side: "LONG", note: "\u201cOn ABB: we say trade is long REITs\u201d" },
+      us_smallcap:    { side: "LONG", note: "\u201cOn ABB: we say trade is long...small cap\u201d" },
+      hk:             { side: "LONG", note: "\u201cOn ABC: we say trade is long Hong Kong property\u201d \u00b7 EWH is broad HK, not HSP" },
+      gold:           { side: "LONG", note: "\u201cOn ABD: we say trade is long gold\u201d" },
+    },
+    unmapped: ["biotech (XBI)", "regional banks (KRE)", "AI bonds — SHORT"],
+    mentions: [
+      "\u201clong \u2018hubris\u2019 (AI)\u201d — bubble-strategy framing, NOT a buy call on AI stocks",
+      "\u201cmost likely consumer, China next few quarters\u201d — forecast of where the humiliation trade lands, not a position",
+    ],
+  },
+  "2026-08-21": {
+    edition: "20 Aug 2026 · Steel Cage Match...Bessent vs ABB",
+    calls: {
+      gold:           { side: "LONG",  note: "\u201cwe agree...long gold remains the cleanest dollar debasement trade\u201d" },
+      sec_realestate: { side: "LONG",  note: "\u201cwe long unloved, long duration REITs\u201d" },
+      us_smallcap:    { side: "LONG",  note: "\u201cwe long unloved, long duration...small cap\u201d" },
+      hk:             { side: "LONG",  note: "\u201cwe long Hong Kong property sector\u201d \u00b7 EWH is broad HK, not HSP" },
+      sec_financials: { side: "SHORT", note: "\u201cwe hedge via short financials\u201d" },
+      // ── VIEW = named with a direction, but NOT named as a position ────────
+      china_stocks: { side: "VIEW +", note: "calls the END of Anywhere-But-China, but the entry he NAMES is HK property; the China-stock rotation \u201cawaits China consumer growth acceleration\u201d" },
+      em_china:     { side: "VIEW +", note: "same thesis as china_stocks \u2014 constructive, entry not named here" },
+      ustech:       { side: "VIEW \u2212", note: "\u201csecular consensus is long AI\u201d is the crowd he fades; he says BARBELL existing AI equity exposure with commodities/natural resources \u2014 a hedge instruction, not a sell" },
+      sec_tech:     { side: "VIEW \u2212", note: "same as ustech \u2014 hedge the exposure, not exit it" },
+    },
+    unmapped: ["biotech (XBI)", "regional banks (KRE)", "AI bonds — SHORT",
+               "commodities / natural resources — barbell against existing AI equity exposure"],
+    mentions: [
+      "\u201csecular consensus is long AI\u201d — the crowd he is fading, not his own position",
+      "\u201cshould Trump hold Senate & Abbott hold Texas, expect stocks (esp. AI) to rip\u201d — conditional, not a call",
+    ],
+  },
+};
+
+// Walk BACK from the selected week. On the latest week this gives the newest
+// call, which is what was asked for; on an older week it gives what was true
+// then, so browsing history never shows a future opinion as if it were current.
+function hartnettCall(assetId, weekDate) {
+  const dates = Object.keys(HARTNETT_CALLS).sort();
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const d = dates[i];
+    if (weekDate && d > weekDate) continue;
+    const ed = HARTNETT_CALLS[d];
+    if (ed.calls[assetId]) {
+      const wks = weekDate ? Math.round((Date.parse(weekDate) - Date.parse(d)) / 604800000) : 0;
+      return { ...ed.calls[assetId], from: d, edition: ed.edition, carriedWeeks: wks };
+    }
+  }
+  if (weekDate && weekDate < dates[0]) return { side: "NOT SOURCED", from: null, carriedWeeks: 0 };
+  return { side: "NOT NAMED", from: null, carriedWeeks: 0 };
+}
+
+// FOUR STATES, not two. The first cut of this table only had "call" and "not
+// named", which forced two different mistakes at once: China read as NOT NAMED
+// even though he devotes half the edition to calling the end of the China bear,
+// and semis read as NOT NAMED even though he names them as the vulnerable side.
+// Neither is a position he states, so neither can be LONG or SHORT — but
+// flattening them to "not named" throws away a real directional view.
+//   LONG / SHORT  he names a POSITION in the first person
+//   VIEW + / −    he names a DIRECTION but not a position (thesis, comparative,
+//                 hedge instruction, "awaits" language)
+//   NOT NAMED     genuinely absent from the edition
+const CALL_STYLE = {
+  LONG:          { bg: "#1FB94C18", color: "#0B7A3B", icon: "\u25b2" },
+  SHORT:         { bg: "#F43F5E18", color: "#B3261E", icon: "\u25bc" },
+  "VIEW +":      { bg: "#1FB94C0E", color: "#3F7A55", icon: "\u25b3" },
+  "VIEW \u2212": { bg: "#F43F5E0E", color: "#A2555F", icon: "\u25bd" },
+  "NOT NAMED":   { bg: "#EFE6D4",   color: "#8A7E68", icon: "\u2014" },
+  "NOT SOURCED": { bg: "#EFE6D4",   color: "#B3A78F", icon: "?" },
+};
+
+function CallBadge({ call }) {
+  const st = CALL_STYLE[call.side] || CALL_STYLE["NOT NAMED"];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "3px 9px", borderRadius: 3, background: st.bg, color: st.color,
+        fontFamily: "'IBM Plex Mono',monospace", fontSize: 9.5, fontWeight: 700,
+        border: `1px solid ${st.color}33`, whiteSpace: "nowrap",
+      }}>
+        {st.icon} {call.side}
+      </span>
+      {call.from && (
+        <span style={{ fontSize: 6.5, color: call.carriedWeeks > 0 ? "#CA8A04" : "#8A7E68" }}>
+          {call.from}{call.carriedWeeks > 0 ? ` \u00b7 carried ${call.carriedWeeks}w` : " \u00b7 latest"}
+        </span>
+      )}
+      {call.note && (
+        <span style={{ fontSize: 6, color: "#8A7E68", maxWidth: 150, textAlign: "right", lineHeight: 1.3 }}>
+          {call.note}
+        </span>
+      )}
     </div>
   );
 }
@@ -2030,6 +2318,39 @@ function HartnettTrackerPutV2() {
         )}
       </div>
 
+      {/* HARTNETT CALL LEDGER — what he NAMED this week, and what he only
+          MENTIONED. The mentions list exists so a sentence that reads like a
+          recommendation but is not one (irony, scare quotes, a forecast, a
+          comparative) has a visible home instead of quietly becoming a LONG
+          badge on some card. That is exactly how ustech and china_stocks got
+          mislabelled on the first pass. */}
+      {history && week && HARTNETT_CALLS[week.date] && (
+        <div style={{ background: "#F6EBD9", border: "1px solid #E2D3B8", borderLeft: "3px solid #6E6657",
+          borderRadius: 6, marginBottom: 12, padding: "9px 12px" }}>
+          <div style={{ fontSize: 8, color: "#111111", letterSpacing: ".14em", marginBottom: 5 }}>
+            HARTNETT CALL LEDGER · {HARTNETT_CALLS[week.date].edition}
+          </div>
+          <div style={{ fontSize: 8, color: "#6E6657", lineHeight: 1.6 }}>
+            <b>NAMED:</b>{" "}
+            {Object.entries(HARTNETT_CALLS[week.date].calls).map(([k, v]) => `${v.side} ${k}`).join(" · ")}
+          </div>
+          {HARTNETT_CALLS[week.date].unmapped && HARTNETT_CALLS[week.date].unmapped.length > 0 && (
+            <div style={{ fontSize: 8, color: "#8A5B00", lineHeight: 1.6, marginTop: 3 }}>
+              <b>NAMED but no asset in this universe:</b>{" "}
+              {HARTNETT_CALLS[week.date].unmapped.join(" · ")}
+            </div>
+          )}
+          {HARTNETT_CALLS[week.date].mentions && HARTNETT_CALLS[week.date].mentions.length > 0 && (
+            <div style={{ fontSize: 8, color: "#B3261E", lineHeight: 1.6, marginTop: 3 }}>
+              <b>MENTIONED — deliberately NOT treated as calls:</b>
+              {HARTNETT_CALLS[week.date].mentions.map((m, i) => (
+                <div key={i} style={{ marginLeft: 8 }}>· {m}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── PROVENANCE BANNER ─────────────────────────────────────────────
           WHY THIS EXISTS: a published artifact serves the version that was
           selected when Publish was pressed, not the newest one. On 2026-08-22
@@ -2271,7 +2592,14 @@ function HartnettTrackerPutV2() {
                     <div style={{ fontSize: 7, color: "#8A7E68", letterSpacing: ".1em" }}>{asset.region}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                    <Badge signal={sig} />
+                    {/* HEADLINE = HARTNETT ONLY. The rule engine still runs — the
+                        trail, the captions and PUT RADAR all read it — but it is no
+                        longer what the card shouts at the top. The operator ladder in
+                        the Hull tile is the mechanical read; two competing mechanical
+                        verdicts on one card is how a system starts arguing with itself.
+                        The 19-WK TABLE keeps the rule verdict, because that view exists
+                        to show how the ENGINE behaved week by week. */}
+                    <CallBadge call={hartnettCall(asset.id, week.date)} />
                     {iv.putVerdict !== "HOLD OFF" && (
                       <span style={{
                         display: "inline-flex", alignItems: "center", gap: 3,
@@ -2316,6 +2644,13 @@ function HartnettTrackerPutV2() {
                         3D not sourced for this week
                       </div>
                     )}
+                    <div style={{ height: 1, background: "#EFE6D4", margin: "5px 0 0" }} />
+                    <LadderDots ladder={computeLadder(asset.id, history.slice(0, activeWeek + 1))} />
+                    {["hk", "em", "thailand", "em_total"].includes(asset.id) && emRuleActive(week.date) && (
+                      <div style={{ fontSize: 6, color: "#CA8A04", marginTop: 3, lineHeight: 1.3 }}>
+                        EM Flow Rule {EM_RULE.read}% · wk {emRuleWeek(week.date)}/{EM_RULE.lifeWeeks} · expires {EM_RULE.expires}
+                      </div>
+                    )}
                   </div>
                   <div style={{ background: "#FFFBF2", borderRadius: 4, padding: "7px 8px" }}>
                     <div style={{ fontSize: 7, color: "#8A7E68", marginBottom: 2 }}>IV (52WK%ILE)</div>
@@ -2346,7 +2681,20 @@ function HartnettTrackerPutV2() {
 
                 <div style={{ marginTop: 8, fontSize: 8, color: "#6E6657", lineHeight: 1.5 }}>
                   {sig === "BUY"         && "✓ Flow + Hull aligned — Entry zone"}
-                  {sig === "WATCH"       && "◈ Flow turning — Wait for Hull confirm"}
+                  {/* WATCH used to print a fixed "wait for Hull confirm" line. That
+                      string was written when WATCH could only mean flow-moving-
+                      Hull-not-yet. It now contradicts the tile directly above it
+                      whenever Hull is already green — BTC on wk19 showed 3D BULL +
+                      W BULL and still read "Wait for Hull confirm". A caption that
+                      argues with the data on the same card is worse than no
+                      caption, so it now reads the actual Hull state. */}
+                  {sig === "WATCH" && (
+                    hull === "green" && hull3d === "green"
+                      ? "◈ Hull confirmed both timeframes — WATCH is this asset's rule ceiling, not a Hull problem"
+                      : hull === "green"
+                        ? "◈ Weekly Hull confirmed · 3D not — waiting on the fast layer"
+                        : "◈ Flow turning — Wait for Hull confirm"
+                  )}
                   {sig === "WAIT"        && "○ Outflow ongoing — Not yet threshold"}
                   {sig === "AVOID / PUT" && "▼ Extreme inflow + sell signal — PUT hedge"}
                   {sig === "REDUCE"      && "↓ Sell signal active — Reduce exposure"}

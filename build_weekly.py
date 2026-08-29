@@ -41,6 +41,13 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
+v1.9: _j() sanitizer + allow_nan=False. hull3d เป็นบล็อกเดียวที่วนจาก DataFrame
+      โดยไม่มี pd.isna guard ทำให้ SETBK (^SET.BK ดึงไม่ได้ 2026-08-28) เขียน
+      NaN ลง margin_pct/color/weekly_color — ไม่ใช่ JSON ที่ถูกต้อง JSON.parse()
+      โยนทั้งไฟล์ ยังไม่มี consumer พังเพราะ tracker splice มือ ไม่ fetch แต่จะ
+      พังทันทีที่เปลี่ยนไป fetch สด. sanitize ทุกบล็อก ไม่ใช่เฉพาะที่พัง.
+      allow_nan=False เป็น assertion ด่านหลัง ห้ามใช้เดี่ยว ๆ โดยไม่ sanitize.
+
 v1.8: drop_incomplete_week() — ตัดแท่งสัปดาห์ที่ยังไม่ปิดก่อนคำนวณ Hull
       cron เดิม (จ.-ศ.) ทำให้ 4 ใน 5 รอบผลิตกระดานจากแท่งครึ่งใบ และ
       validate() จับไม่ได้เพราะ coverage ยังขึ้น 100% ทุก ticker มีค่าครบ
@@ -638,6 +645,26 @@ def drop_lagging_columns(wide: pd.DataFrame, obs_last: dict) -> pd.DataFrame:
     return wide
 
 
+def _j(v):
+    """NaN / NaT / pd.NA -> None. ใช้กับทุกค่าที่ออกจาก DataFrame ก่อนลง JSON.
+
+    ทำไมต้องมี: NaN เป็น float ที่ json.dumps ยอมเขียนได้ แต่ JSON.parse()
+    อ่านไม่ได้ (ไม่ใช่ JSON ตาม RFC 8259) จึงพังเงียบที่ฝั่ง consumer ไม่ใช่
+    ฝั่งเรา — run ขึ้นเขียว ไฟล์มีอยู่ แต่ใครก็ตามที่ parse จะเจอ error ทั้งไฟล์
+
+    เจอจริง 2026-08-28: ^SET.BK ดึงไม่ได้ (coverage 0.974) hull_weekly เขียน
+    null ถูกต้อง แต่ hull3d เขียน NaN ลง margin_pct / color / weekly_color
+    เพราะเป็นบล็อกเดียวที่วนจาก DataFrame ตรง ๆ โดยไม่มี pd.isna guard
+    ขณะที่บล็อก vol ที่อยู่ถัดลงไปสามบรรทัดกรองครบ
+    """
+    try:
+        if v is None or (not isinstance(v, (list, dict)) and pd.isna(v)):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
 def write_board(rep: dict, hull_rows: list, h3: pd.DataFrame,
                 vol_snap: pd.DataFrame, pcr: dict) -> None:
     """รวมทุกอย่างที่ต้องใช้ไว้ในไฟล์เดียว เสิร์ฟผ่าน GitHub Pages
@@ -650,25 +677,40 @@ def write_board(rep: dict, hull_rows: list, h3: pd.DataFrame,
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "coverage": rep["coverage"],
         "rows": rep["rows"],
+        # ทุกบล็อกด้านล่างผ่าน _j() เหมือนกันหมด ไม่ใช่เฉพาะบล็อกที่เคยพัง
+        # ความถูกต้องที่ขึ้นกับ "ต้นทางกรองมาให้แล้ว" จะพังทันทีที่ใครแก้ต้นทาง
         "hull_weekly": [
-            {k: r[k] for k in ("ticker", "close", "margin_pct", "color", "near_flip")}
+            {k: _j(r[k]) for k in ("ticker", "close", "margin_pct", "color", "near_flip")}
             for r in hull_rows
         ],
         "hull3d": [
-            {"ticker": r["ticker"], "margin_pct": r["margin_pct"], "color": r["color"],
-             "near_flip": r["near_flip"], "weekly_color": r.get("weekly_color"),
-             "agree": r.get("agree"), "est_flag": r["est_flag"]}
+            {"ticker": r["ticker"],
+             "margin_pct":   _j(r["margin_pct"]),
+             "color":        _j(r["color"]),
+             "near_flip":    _j(r["near_flip"]),
+             "weekly_color": _j(r.get("weekly_color")),
+             "agree":        _j(r.get("agree")),
+             "est_flag":     r["est_flag"]}
             for _, r in h3.iterrows()
         ] if h3 is not None and not h3.empty else [],
         "vol": [
-            {"index": r["index"], "close": (None if pd.isna(r["close"]) else r["close"]),
-             "pct_52w": (None if pd.isna(r["pct_52w"]) else r["pct_52w"]),
-             "asof": (None if pd.isna(r["asof"]) else r["asof"])}
+            {"index": r["index"], "close": _j(r["close"]),
+             "pct_52w": _j(r["pct_52w"]), "asof": _j(r["asof"])}
             for _, r in vol_snap.iterrows()
         ] if vol_snap is not None and not vol_snap.empty else [],
         "put_call_equity": pcr,
     }
-    BOARD.write_text(json.dumps(board, indent=1, default=str))
+    # allow_nan=False เป็น ASSERTION ด่านหลัง ไม่ใช่ตัวแก้ปัญหา
+    # ถ้ามันโยน แปลว่ามี NaN ที่ _j() ยังไม่ครอบคลุม = บั๊กใหม่ ต้องรู้ทันที
+    # ห้ามใช้ allow_nan=False โดยไม่ sanitize ก่อน: write_board ถูกเรียกหลัง
+    # CSV ทุกไฟล์เขียนเสร็จแล้ว ถ้าโยนตรงนี้จะได้ CSV ใหม่ + board เก่า
+    # = Actions เขียวแต่ข้อมูลค้าง ซึ่งคือรูปแบบที่หลอกให้วินิจฉัยผิดมาแล้ว 4 ครั้ง
+    try:
+        payload = json.dumps(board, indent=1, default=str, allow_nan=False)
+    except ValueError as e:
+        print(f"FATAL: board.json มี NaN ที่ _j() ไม่ได้กรอง — {e}", file=sys.stderr)
+        raise
+    BOARD.write_text(payload)
     print(f"WROTE {BOARD}")
 
 

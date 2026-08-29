@@ -1,14 +1,10 @@
 {
   "asof": "2026-08-28",
-  "coverage": 0.974,
+  "coverage": 1.0,
   "rows": 157,
-  "missing_tickers": [
-    "SETBK"
-  ],
-  "run_utc": "2026-08-29T08:32:15+00:00",
-  "hull_nulls": [
-    "SETBK"
-  ],
+  "missing_tickers": [],
+  "run_utc": "2026-08-29T22:55:43+00:00",
+  "hull_nulls": [],
   "near_flips": [
     "EEM +0.20",
     "MCHI -0.02",

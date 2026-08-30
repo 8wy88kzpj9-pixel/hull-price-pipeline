@@ -1,7 +1,7 @@
 {
  "asof": "2026-08-28",
- "generated_utc": "2026-08-29T22:57:01+00:00",
- "coverage": 1.0,
+ "generated_utc": "2026-08-30T11:48:59+00:00",
+ "coverage": 0.974,
  "rows": 157,
  "hull_weekly": [
   {
@@ -104,7 +104,7 @@
   },
   {
    "ticker": "BTCUSD",
-   "close": 78208.4062,
+   "close": 78172.0078,
    "margin_pct": 1.1,
    "color": "green",
    "near_flip": false
@@ -209,10 +209,10 @@
   },
   {
    "ticker": "SETBK",
-   "close": 1588.22,
-   "margin_pct": 0.74,
-   "color": "green",
-   "near_flip": false
+   "close": null,
+   "margin_pct": null,
+   "color": null,
+   "near_flip": null
   },
   {
    "ticker": "URTH",
@@ -407,7 +407,7 @@
   },
   {
    "ticker": "BTCUSD",
-   "margin_pct": 1.76,
+   "margin_pct": 1.83,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -542,11 +542,11 @@
   },
   {
    "ticker": "SETBK",
-   "margin_pct": 0.47,
-   "color": "green",
-   "near_flip": false,
-   "weekly_color": "green",
-   "agree": true,
+   "margin_pct": null,
+   "color": null,
+   "near_flip": null,
+   "weekly_color": null,
+   "agree": null,
    "est_flag": "parallel-validation"
   },
   {
@@ -676,15 +676,15 @@
   },
   {
    "index": "VXEWZ",
-   "close": 29.32,
-   "pct_52w": 47.2,
-   "asof": "2026-07-17"
+   "close": null,
+   "pct_52w": null,
+   "asof": null
   },
   {
    "index": "VXEFA",
-   "close": 16.58,
-   "pct_52w": 49.6,
-   "asof": "2026-07-17"
+   "close": null,
+   "pct_52w": null,
+   "asof": null
   },
   {
    "index": "VXHYG",
@@ -708,9 +708,9 @@
  "put_call_equity": {
   "value": null,
   "asof": "2019-10-04",
-  "age_days": 2521,
+  "age_days": 2522,
   "series": "cboe_equity",
-  "status": "STALE_2521d_source_is_archive",
+  "status": "STALE_2522d_source_is_archive",
   "w5_avg": null
  }
 }

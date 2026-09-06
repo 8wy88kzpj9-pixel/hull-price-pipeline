@@ -187,6 +187,7 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-09-04,XLU,167,43.08,44.1086,44.2765,-0.38,red,False,parallel-validation,red,True
 2026-09-04,XLV,167,171.45,168.1064,166.6305,0.89,green,False,parallel-validation,green,True
 2026-09-04,XLY,167,114.91,116.7593,116.8334,-0.06,red,True,parallel-validation,green,False
+2026-09-05,BTCUSD,243,79823.8672,66765.1018,65272.8209,2.29,green,False,parallel-validation,green,True
 ,SETBK,0,,,,,,,parallel-validation,green,
 ,SETBK,0,,,,,,,parallel-validation,,
 ,SETBK,0,,,,,,,parallel-validation,,

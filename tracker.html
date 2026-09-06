@@ -52,6 +52,94 @@
 const { useState, useEffect, useCallback } = React;
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── v2.15.0 (2026-09-06): wk21 "Let them eat data" SPLICED.
+//   Edition dated 03 Sep 2026. Hull from board.json asof 2026-09-04
+//   (generated 2026-09-06T10:46:18Z, coverage 1.0, 39 tickers, build 869).
+//
+//   ⚠️ SOURCE-DOCUMENT DEFECT, NOT OURS: the Table 3 footnote reads "week ended
+//   8/26/2026" — byte-identical to the 28 Aug edition — while every YTD line in
+//   Tables 3 and 4 moved and Tables 7/8 are stamped "as of 2 September 2026".
+//   The footnote is a stale copy-paste at BofA. Correct EPFR week is ended 9/2.
+//   Logged loudly because a date field that says nothing changed, sitting next
+//   to data that did, is the exact shape of the wrong-year OAS incident.
+//
+//   ★ FIRST FULLY CLEAN SINGLE-WEEK RECONCILIATION. Every Table 4 line checks
+//   against last week's YTD with no two-week fallback: US -5,892 / Japan +1,361
+//   / Europe +846 / China -5,259 / India -170 / Total EM -5,391 / Total
+//   Equities +2,842 / ETFs +7,145 / LO -4,289 / Brazil -345. Additivity holds.
+//
+//   ★★ BREADTH RULE 81.8% -> 63.6%, an 18-point one-week fall, the largest move
+//   in any Rules & Tools line in this seed. It CONTRADICTS the B&B breadth
+//   component, which was upgraded to 83% V.Bullish in the same edition and
+//   named as the offset to tech outflows. Two breadth constructions pointing
+//   opposite ways, no country table this week to adjudicate. NOT resolved.
+//
+//   ONE mapped weekly flip: MCHI red -> GREEN, in the same week China prints
+//   -0.8%, its deepest outflow of the run and BofA's 5th straight — which
+//   retroactively answers whether wk17 was negative (it was).
+//   SIX mapped 3D flips: XLK, THD, XLY green->red; HYG green->red (back after
+//   one week at +0.00); EWZ, XLC red->green. XLC +0.00 prints GREEN while
+//   HYG -0.02 prints RED — third consecutive week the rounded margin lies.
+//   3D-vs-weekly agreement 74% -> 62%, lowest of the series again.
+//
+//   HARTNETT: short financials RESTATED, which RESOLVES the wk20 XLF conflict
+//   in favour of the short. Mag7 upgraded to VIEW + one week after being
+//   VIEW − — badged on ustech only, since he named Mag7 not the sector, so
+//   sox/sec_tech keep their carried VIEW −. The split is deliberate.
+//
+//   IV: VXEWZ and VXEFA REAPPEARED after last week's null — but at the SAME
+//   2026-07-17 timestamp, now 49 days old. Restored as stale:true (shown,
+//   excluded from Put Radar), not as fresh. ⚠️ VXEFA's percentile moved
+//   20.6 -> 49.6 on an UNCHANGED 16.58 close because the trailing window
+//   rolled. A percentile on a frozen quote is not a reading.
+//
+//   CARRIED, NOT FIXED (2nd week): the `bonds` field is labelled "HY Bonds"
+//   but stores the total bond headline (18.3). Real HY print +$1.5bn.
+//
+// ─── v2.14.0 (2026-08-30): wk20 "Investing with Pleasure" SPLICED.
+//   Edition dated 28 Aug 2026, EPFR week ended 8/26, row labeled Fri 2026-08-28.
+//   Hull from board.json asof 2026-08-28 (generated 2026-08-29T22:55:43Z,
+//   coverage 1.0, 39 tickers, missing_tickers [], build_weekly 869).
+//
+//   ★★ RULES & TOOLS TABLE RETURNS after five missing editions. EM Flow
+//   Trading Rule prints -0.1% NEUTRAL. emOutflow4wk goes from null to 0.1
+//   (printed x -1 per the standing convention — DO NOT flip this sign).
+//   Consequence: hk/em/thailand/em_total stop returning NO RULE DATA and
+//   return WAIT instead. 0.1 is far below the 3.0 buy threshold, so nothing
+//   opens. EM_RULE.expires 2026-09-17 is deliberately UNCHANGED — the object
+//   describes the wk15 reading and its life, and editing it in place to mean
+//   something else is the rename collision this file has been burned by.
+//
+//   ★ cashLevel 3.5% — first live FMS print in seven editions (was carried
+//   3.6% since wk13). The wk18 pre-registered trigger is now HALF met: cash
+//   is below 3.6%, equity allocation still not printed. Half is not the
+//   trigger, and GWIM equity 66.2% is a different survey (§6.2).
+//
+//   ZERO weekly Hull flips vs 8/21 — all 31 mapped colours identical.
+//   THREE 3D flips, all hairline: HYG red->GREEN at +0.00, IWF green->RED at
+//   -0.00, XLRE green->RED at -0.04. HYG +0.00 green next to IWF -0.00 red is
+//   a live restatement of "never infer colour from a rounded margin".
+//   3D-vs-weekly agreement fell 85% -> 74% (10 of 39 disagree).
+//
+//   IV: VXEWZ and VXEFA went from present-but-stale to NULL in board.json, so
+//   em_brazil / japan_stocks / europe_stocks are nulled rather than carried.
+//   Brazil now has no IV read five weeks before its election.
+//
+//   LOGGED, NOT FIXED: the `bonds` field is labelled "HY Bonds" (proxy HYG)
+//   but has stored TOTAL bond flow every week of this seed. wk20 keeps the
+//   convention (17.7) so the 20-week series keeps one meaning; the real HY
+//   print (-0.7bn, first outflow in 6 weeks) is recorded in srcNotes. Fixing
+//   it needs a NEW field name plus a version bump — never an in-place
+//   redefinition. See srcNotes.bonds_field_defect.
+//
+//   VERIFIED THIS WEEK, worth recording because it settled two open questions:
+//   computeSignal has NO global B&B suspension — bbHi/bbXHi appear only in the
+//   sox/ustech/sec_tech, global_stocks and us_largecap branches and produce
+//   REDUCE, never a blanket block. And computeLadder does not read EM_RULE at
+//   all; the asset-scoped EM suspension lives in operator discipline, not in
+//   this code.
+//
 // ─── v2.8.0 (2026-08-16): wk18 "Strife Begins at Forty" SPLICED.
 //   Edition dated 13 Aug 2026 (quilt footer), EPFR week ended 8/12 (Table 1
 //   footnote) -> row labeled Fri 2026-08-14. Hull VERBATIM from board.json
@@ -215,9 +303,9 @@ const { useState, useEffect, useCallback } = React;
 // Bump BOTH when shipping: TRACKER_VERSION is what a viewer sees on the
 // banner, SEED_VERSION is what the load gate compares. They answer
 // different questions and must not be collapsed into one string.
-const TRACKER_VERSION = "v2.13.0";
-const HULL_ASOF_DISPLAY = "2026-08-21";
-const SEED_VERSION = "2.9.0-wk19-0823"; // wk18 "Strife Begins at Forty" spliced 2026-08-16 (Flow Show 13 Aug edition, EPFR wk ended 8/12); IV_DATA re-spliced same day. SEED CONTENT CHANGED -> bump is REQUIRED: the strict-equality gate below orphans 2.6.0 saves so the new week is actually served. // wk14 "Fade Runner" spliced 2026-07-19 (Flow Show 7/17 edition) // v2.1: wk12 baked into seed (rev 1.2 seed-splice workflow). NOTE: strict-equality load gate below intentionally orphans v2.0 saves — fresh instances start empty anyway; patch replay is the recovery path.
+const TRACKER_VERSION = "v2.15.0";
+const HULL_ASOF_DISPLAY = "2026-09-04";
+const SEED_VERSION = "2.11.0-wk21-0906"; // wk21 "Let them eat data" spliced 2026-09-06 (Flow Show 03 Sep, EPFR wk ended 9/2 — NOT 8/26 as the source footnote wrongly repeats). Seed content changed -> bump REQUIRED.
 const STORAGE_KEY  = "hartnettPutV2_0"; // bumped: payload shape changed (added dataVersion)
 
 async function saveHistory(history, dataVersion) {
@@ -307,19 +395,23 @@ const KNOWN_FLOW_IDS = new Set([...ALL_ASSETS.map(a => a.id), "hk", "thailand", 
 // Sourced-or-null rule that caught the 2019 put/call archive file.
 // ivLo / ivHi / putBuy / putThresh are DESIGN BANDS, not observations, and are
 // deliberately left unchanged.
-const IV_ASOF = "2026-08-21";
+const IV_ASOF = "2026-09-04";
 const IV_DATA = {
-  // ── live from board.json vol_indices asof 2026-08-14 ──────────────────────
-  us_largecap:   { iv: 15.13, pct: 11.9, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 27, src: "VIX 15.13 · board 8/21 · up from 14.25/2.8%ile" },
-  global_stocks: { iv: 15.13, pct: 11.9, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 26, src: "VIX 15.13 proxy · board 8/21" },
-  ustech:        { iv: 21.98, pct: 36.5, ivLo: 17.2, ivHi: 33.5, putBuy: 19, putThresh: 34, src: "VXN 21.98 · board 8/21" },
-  sec_tech:      { iv: 21.98, pct: 36.5, ivLo: 17.2, ivHi: 33.5, putBuy: 20, putThresh: 35, src: "VXN 21.98 proxy · board 8/21" },
-  gold:          { iv: 27.29, pct: 67.5, ivLo: 15.2, ivHi: 45.5, putBuy: 16, putThresh: 34, src: "GVZ 27.29 · board 8/21 · JUMPED 34.9 -> 67.5%ile in one week while gold flow stayed positive" },
+  // ── live from board.json vol_indices asof 2026-09-04 ──────────────────────
+  us_largecap:   { iv: 14.53, pct: 5.2, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 27, src: "VIX 14.53 · board 9/4 · 5.2%ile · flat on the week, 4th week pinned at the floor. VVIX 2.4%ile, SKEW 87.7%ile" },
+  global_stocks: { iv: 14.53, pct: 5.2, ivLo: 13.6, ivHi: 31.1, putBuy: 14, putThresh: 26, src: "VIX 14.53 proxy · board 9/4" },
+  ustech:        { iv: 20.04, pct: 15.5, ivLo: 17.2, ivHi: 33.5, putBuy: 19, putThresh: 34, src: "VXN 20.04 · board 9/4 · 20.2 -> 15.5%ile, compressing while tech takes its biggest outflow since Jun26" },
+  sec_tech:      { iv: 20.04, pct: 15.5, ivLo: 17.2, ivHi: 33.5, putBuy: 20, putThresh: 35, src: "VXN 20.04 proxy · board 9/4" },
+  gold:          { iv: 26.63, pct: 58.7, ivLo: 15.2, ivHi: 45.5, putBuy: 16, putThresh: 34, src: "GVZ 26.63 · board 9/4 · 3rd straight fall 67.5 -> 61.1 -> 58.7%ile while gold YTD slipped 5.9% -> 3.8% on a 9th inflow week" },
 
-  // ── present but STALE in board.json (asof 2026-07-17, 28 days) ────────────
-  em_brazil:     { iv: 29.32, pct: 47.2, stale: true, ivLo: 8.1, ivHi: 56.8, putBuy: 25, putThresh: 44, src: "VXEWZ 29.32 · board asof 7/17 ⚠35d — no current read into Oct 4 election" },
-  japan_stocks:  { iv: 16.58, pct: 20.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 17, putThresh: 27, src: "VXEFA 16.58 · board asof 7/17 ⚠35d — regional, not JP-specific" },
-  europe_stocks: { iv: 16.58, pct: 20.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 15, putThresh: 25, src: "VXEFA 16.58 · board asof 7/17 ⚠35d — regional, not EU-specific" },
+  // ── REAPPEARED, NOT REFRESHED. wk19 stale @7/17 -> wk20 NULL -> wk21 back at
+  //    the SAME 2026-07-17 timestamp, now 49 days old. Marked stale:true, shown
+  //    on the card, EXCLUDED from Put Radar. ⚠️ The percentile moved without the
+  //    price (VXEFA 20.6 -> 49.6%ile on an unchanged 16.58) because the trailing
+  //    52wk window rolled. A percentile on a frozen quote is not a reading.
+  em_brazil:     { iv: 29.32, pct: 47.2, stale: true, ivLo: 8.1, ivHi: 56.8, putBuy: 25, putThresh: 44, src: "VXEWZ 29.32 · board asof 7/17 ⚠49d — no current read one month before the Oct 4 election" },
+  japan_stocks:  { iv: 16.58, pct: 49.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 17, putThresh: 27, src: "VXEFA 16.58 · board asof 7/17 ⚠49d — regional, not JP-specific; %ile rolled without the price" },
+  europe_stocks: { iv: 16.58, pct: 49.6, stale: true, ivLo: 13.0, ivHi: 33.5, putBuy: 15, putThresh: 25, src: "VXEFA 16.58 · board asof 7/17 ⚠49d — regional, not EU-specific; %ile rolled without the price" },
 
   // ── pipeline reports NULL (Yahoo does not serve these) — was carrying
   //    hardcoded numbers before this fix. Sourced-or-null now enforced.
@@ -1160,7 +1252,7 @@ const SEEDED_HISTORY = [
       tape: "Scores on the Doors YTD: commodities +58.9%, oil +43.0%, ACWX +14.8%, SPX +13.9%, HY +2.3%, cash +2.2%, US$ +1.7%, GOLD +1.0%, IG -0.4%, govt bonds -1.5%, bitcoin -27.9%. GOLD HAS FLIPPED POSITIVE YTD (was -2.3% at wk17) in the same week as its biggest inflow since Jan'26. Zeitgeist quote: '$12.5bn for Lakers why bonds can't rally on no inflation and no jobs growth'",
     },
   },
-  // ── Week 19: Aug 21 ★ LATEST SEED ── "Steel Cage Match...Bessent vs ABB"
+  // ── Week 19: Aug 21 ── "Steel Cage Match...Bessent vs ABB"
   // Edition 20 Aug 2026 · EPFR week ended 8/19 · row labeled Fri 2026-08-21.
   {
     date: "2026-08-21",
@@ -1254,6 +1346,198 @@ const SEEDED_HISTORY = [
       three_arrows: "US admin 0-for-3 on its own targets: 3% GDP growth (actual <2% for six quarters), 3% budget deficit (actual 6%), +3mbpd oil production (actual +0.3mbpd since '24). Trump approval 39% overall, 36% on economy, 30% on inflation — all well below pre-war averages of 46/42/38",
       private_clients: "$4.7tn AUM, 66.5% stocks (from 66.4%), 16.9% bonds (from 17.0%), 9.4% cash (unchanged at the record low). Biggest weekly inflow to BONDS since May'26. Past 4wk ETF buying: Japan, muni bonds, TIPS. Selling: EM debt, utilities, FINANCIAL sector ETFs — the same sector Hartnett now says to short. Cumulative since 2020: $52bn to T-notes vs $28bn to T-bills, the gap still widening",
       tape: "Scores on the Doors YTD: oil +53.0%, global stocks +13.9%, US stocks +11.6%, GOLD +4.0%, HY +2.6%, cash +2.3%, US DOLLAR +0.6%, IG +0.1%, govt bonds -1.1%, bitcoin -16.9%. Gold has gone -2.3% -> +1.0% -> +4.0% over three weeks. The dollar has faded +1.7% -> +0.6% in the same span, which is the ABD thesis showing up in the returns table. Bitcoin recovered from -27.9% to -16.9% in one week, which is what the Hull flip to green is measuring. Zeitgeist quote: 'I mean if private credit can't rally on QE5 then what is the world coming to'",
+    },
+  },
+  // ── Week 20: Aug 28 ── "Investing with Pleasure"
+  // Edition 28 Aug 2026 · EPFR week ended 8/26 · row labeled Fri 2026-08-28.
+  {
+    date: "2026-08-28",
+    title: "Investing with Pleasure",
+    bb: 9.7, pcRatio: null, skew: 149.77, vix: 14.51, emOutflow4wk: 0.1, cashLevel: 3.5,
+    flows: {
+      em: 0.0, em_total: 0.0, china_stocks: -0.1, em_china: -0.1,
+      em_brazil: 0.4, em_india: -0.3, hk: null, thailand: null,
+      global_stocks: 9.2, japan_stocks: 2.7, europe_stocks: -0.2,
+      sox: null, ustech: null,
+      gold: 7.3, precious_metals: 7.3, bonds: 17.7, crypto: 3.2, ig_bonds: 7.7,
+      us_largecap: -5.1, us_value: -2.3, us_smallcap: 0.4, us_growth: -2.7,
+      sec_tech: 4.6, sec_comsvs: -0.2, sec_financials: -1.2, sec_hcare: -1.1,
+      sec_utilities: 0.1, sec_consumer: -0.6, sec_realestate: -0.4,
+      sec_energy: -0.2, sec_materials: 4.2,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "red", em_china: "red",
+      em_brazil: "red", em_india: "green", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "green", sec_consumer: "green",
+    },
+    // Hull 3D (HMA55 on 3-day bars) spliced from board.json hull3d.
+    // Present ONLY for weeks where board.json was actually read. Earlier
+    // weeks carry no field at all and render "—" — never a back-filled guess.
+    hull3dSignals: {
+      global_stocks: "green",
+      japan_stocks: "green",
+      europe_stocks: "green",
+      em: "red",
+      em_total: "red",
+      china_stocks: "green",
+      em_china: "green",
+      em_brazil: "red",
+      em_india: "green",
+      hk: "green",
+      thailand: "green",
+      sox: "red",
+      ustech: "green",
+      sec_tech: "green",
+      gold: "green",
+      precious_metals: "green",
+      bonds: "green",
+      ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green",
+      us_smallcap: "green",
+      us_growth: "red",
+      us_value: "green",
+      sec_comsvs: "red",
+      sec_financials: "green",
+      sec_hcare: "green",
+      sec_utilities: "red",
+      sec_realestate: "red",
+      sec_energy: "green",
+      sec_materials: "green",
+      sec_consumer: "green",
+    },
+    estFlags: {},
+    volAux: {
+      gvz: { value: 26.8, asOf: "2026-08-27", src: "board.json — gold vol 61.1%ile, down from 67.5%ile but still the second-highest reading on the vol board. Gold IV is not cheap" },
+      vxn: { value: 20.24, asOf: "2026-08-27", src: "board.json — 20.2%ile, down from 36.5%. NDX vol compressed in the same week tech took its biggest inflow in 4 weeks (+$4.6bn)" },
+      vvix: { value: 82.9, asOf: "2026-08-27", src: "board.json — 0.8%ile. Vol-of-vol at the lowest reading in the 52wk range. Convexity has never been cheaper in this series" },
+      ovx: { value: 46.22, asOf: "2026-08-27", src: "board.json — 45.6%ile, down from 52.8%. Oil +44.3% YTD, still the top single asset on Scores on the Doors" },
+      note: "⚠️ CHANGED THIS WEEK: VXEWZ and VXEFA are now NULL in board.json — at wk19 they were present-but-stale (29.32 / 16.58 asof 2026-07-17). They have dropped out of the feed entirely rather than aged further. Brazil therefore has NO IV read at all five weeks before the Oct 4 election, and Japan/Europe lose their regional proxy. VXEEM / VXFXI / VXHYG / RVX remain null as before.",
+    },
+    srcNotes: {
+      bb: "9.5 -> 9.7, a new high for this cycle and the second straight weekly rise. Verbatim drivers: stronger global stock index breadth, hedge funds increasing gold longs and VIX SHORTS, partially offset by HY bond outflows. Positioning described as 'extreme bull territory'. Components: HF Positioning 84% V.Bullish, Equity Flow 92% V.Bullish, Bond Flow 65% NEUTRAL, Credit Market Technicals 77% Bullish, Global Stock Index Breadth 77% BULLISH (was 65% Neutral — the component that moved), FMS Positioning 100% V.Bullish. 'Old' B&B 8.1 (from 7.9). Scorecard since the 26 May sell signal restated AGAIN: SPX +2.8% and ACWI +3.3% this week vs +1.6% / +1.3% last week vs +4% / +3% the week before. Three different numbers for the same signal over the same window in three weeks. Treat the base rate (17 signals, avg 2-3% loss over 2-3 months, ~60% hit ratio) as the durable figure and ignore the weekly restatement entirely",
+      emOutflow4wk: "★★ THE RULES & TOOLS TABLE IS BACK AFTER FIVE MISSING EDITIONS. EM Flow Trading Rule prints a LIVE reading: -0.1% with signal NEUTRAL, duration 8 weeks. Stored as +0.1 per the outflow-sign convention (printed value x -1). This SUPERSEDES the 2.2% SELL carried from wk15 — the carry existed only because BofA stopped printing, and BofA has now printed. NOTE WHAT THIS DOES AND DOES NOT DO: emOutflow4wk is no longer null, so hk/em/thailand/em_total stop returning NO RULE DATA. But 0.1 is nowhere near the 3.0 buy threshold, so the verdict moves to WAIT, not BUY. The gate is still shut — it is now shut for a SOURCED reason instead of an unevaluable one. EM_RULE.expires 2026-09-17 is unchanged and still governs emRuleActive()",
+      cashLevel: "★ 3.5% — FIRST LIVE PRINT IN SEVEN EDITIONS, from Table 4 BofA Global FMS Cash Indicator, signal Sell, duration 4 weeks. Down from the 3.6% that had been carried since wk13. ⚠️ THE wk18 PRE-REGISTERED TRIGGER IS NOW HALF-RESOLVED: he wrote that cash below 3.6% PLUS FMS equity allocation above 52% OW would read TAKE PROFITS. Cash has now printed below 3.6%. The equity-allocation number is STILL not printed in this note. Half a condition is not the condition — do NOT infer the second leg from BofA Private Client equity at 66.2%, which is a different survey (§6.2 GWIM != FMS)",
+      rules_tools: "Full Table 4 as printed, first complete set since wk15: B&B 9.7 SELL (1-3 months) · FMS Cash 3.5% SELL (4 weeks) · Global Breadth Rule 81.8% NEUTRAL (3 months) · Global Flow Trading Rule 0.6% NEUTRAL (8 weeks) · EM Flow Trading Rule -0.1% NEUTRAL (8 weeks) · Global EPS Growth Model 9% EPS GROWTH RISING (6-12 months). Two of six read Sell, three Neutral, one constructive. Note the EPS model is unchanged at 9% — the same figure as wk15, and still NOT the same series as the S&P 500 12m forward EPS number quoted in earlier editions",
+      breadth_rule: "82% of global equity indices trading above BOTH 50dma and 200dma. Sell threshold is >88%, so NEUTRAL. Table 1 holdouts named verbatim: China, India, Brazil. Reading the table directly for the operator's own markets: THAILAND is NEUTRAL (-0.5% vs 50dma, +5.1% vs 200dma) — below its 50dma. HONG KONG is EXTENDED (+3.6% / +1.2%) but only barely above the 200dma. CHINA is NEUTRAL (+2.5% / -4.9%) and still below its 200dma. KOREA is NEUTRAL at exactly -0.0% vs 50dma despite +19.4% vs 200dma. This is the first week the breadth layer of the four-layer stack has been spliced at all",
+      flows_pct: "Table 3 Wk %AUM: Total EM 0.0, China -0.1, Brazil +0.4, India -0.3, Total DM 0.0, US 0.0, Europe 0.0, Japan +0.2, International +0.1. BRAZIL TURNS POSITIVE after two straight negative weeks (-2.1, -1.1, now +0.4) five weeks before the Oct 4 election. CHINA IS NEGATIVE FOR A THIRD CONSECUTIVE WEEK (-2.1, -0.1, -0.1) — this completes the 3-week flow-out window used by ไม้ v2.2",
+      flows_reconciled: "Cross-checked against Table 3 YTD before entry, not transcribed: US 433,620 -> 429,230 = -4,390mn vs printed -$4.4bn ✓ · Japan 21,581 -> 24,244 = +2,663mn vs +$2.7bn ✓ · Europe -16,299 -> -16,449 = -150mn vs -$0.2bn ✓ (rounds) · Total Equities 811,435 -> 820,678 = +9,243mn vs $9.2bn ✓ · Brazil 3,305 -> 3,392 = +87mn at +0.4% implies ~$21.8bn AUM, consistent with the ~$21bn implied last week ✓. ⚠️ PARTIAL: China, India and Total EM YTD were not recorded in the wk19 seed, so those three can only be checked over TWO weeks against wk18: China -200,781 -> -202,061 = -1,280mn over 2wk, consistent with -0.1%/wk on the ~$690bn AUM implied by wk18's -$14.5bn at -2.1% ✓ · India -10,125 -> -10,761 = -636mn ✓ direction · Total EM -44,925 -> -44,857 = +68mn, consistent with -$0.4bn then +$0.4bn ✓. These three are labelled two-week checks and must not be reported as single-week verifications",
+      flows_notable: "Weekly: $17.7bn bonds, $9.2bn stocks, $9.2bn CASH, $7.3bn gold, $3.2bn crypto. GOLD $7.3bn = BIGGEST INFLOW SINCE OCT'25 and 8th straight week of precious-metal inflows. CRYPTO $3.2bn = BIGGEST SINCE OCT'25. HY bonds -$0.7bn = 1st outflow in 6 weeks and biggest since Apr'26 — this is the component B&B names as the only thing holding the indicator down. US stocks -$4.4bn = 1st outflow in 5 weeks. Tech +$4.6bn biggest in 4 weeks. Materials +$4.2bn biggest since Mar'26. Healthcare -$1.1bn biggest since Mar'26. Bonds now 70 consecutive weeks of inflows, IG 21 weeks, munis 19, TIPS 30. Equities $9.2bn = $25.0bn ETFs MINUS $15.9bn mutual funds — the widest ETF/mutual split in the series",
+      flows_style_sector: "By style: the ONLY inflow is US SMALL CAP +$0.4bn. Outflows US large cap -$5.1bn, US growth -$2.7bn, US value -$2.3bn. Every style bucket except small cap is negative in the same week the index is at highs — and small cap is one of the four names in Hartnett's own ABB long list. By sector INFLOWS: tech +$4.6bn, materials +$4.2bn, utils +$0.1bn. OUTFLOWS: financials -$1.2bn, healthcare -$1.1bn, consumer -$0.6bn, real estate -$0.4bn, energy -$0.2bn, com svs -$0.2bn. ⚠️ THREE OF HIS OWN LONGS ARE IN THEIR THIRD STRAIGHT OUTFLOW WEEK: real estate (-0.1, -0.1, -0.4), consumer (-0.6, -0.5, -0.6) and healthcare (-1.0, -0.5, -1.1). Financials is also in a third negative week, which AGREES with his short",
+      bonds_field_defect: "⚠️ FIELD-NAMING DEFECT CARRIED, NOT FIXED. The asset id `bonds` is labelled 'HY Bonds' with TICKER_MAP proxy HYG, but every week in this seed stores the TOTAL bond flow in it (wk18 23.8, wk19 21.4, wk20 17.7 — all headline 'to bonds' figures). The actual HY print this week is -$0.7bn, the first outflow in 6 weeks. Changing the field now would give one field two meanings across a 20-week series — the exact collision that destroyed the vol history and inverted the emOutflow4wk sign. The convention is therefore PRESERVED and the defect is logged here. Fixing it requires a NEW field name (e.g. `hy_bonds`) plus a version bump, per the rename rule — never an in-place redefinition",
+      vix: "^VIX 14.51 close 2026-08-27 from board.json, 4.4%ile of its own 52wk range — down from 15.13/11.9%ile. ⚠️ READ THIS WITH VVIX AND SKEW TOGETHER: VVIX 82.9 at the 0.8%ile is the lowest reading anywhere on the vol board, while SKEW 149.77 sits at the 80.6%ile. Spot vol and vol-of-vol are at the floor while tail pricing is in the top quintile. B&B also names hedge funds increasing VIX SHORTS as a driver of the move to 9.7 — the short-vol trade is now an explicit component of the sell signal",
+      skew: "149.77 @2026-08-28 from Cboe via pipeline. 46.8%ile -> 80.6%ile in one week, on top of 9.1 -> 46.8 the week before. SKEW has gone from the bottom decile to the top quintile in fourteen days while the index made new highs. Two consecutive weeks of the largest percentile move on the board",
+      pcRatio: "null — Cboe equity put/call still unsourced, board reports STALE_2521d_source_is_archive (asof 2019-10-04). Unchanged for a seventh week. This is now a standing decision to accept a permanent null rather than an open task",
+      hull: "board.json asof 2026-08-28 VERBATIM (generated 2026-08-29T22:55:43Z, coverage 1.0, rows 157, 39 tickers, missing_tickers [], hull_nulls [], build_weekly 869). ★ ZERO WEEKLY FLIPS vs 8/21 — all 31 mapped weekly colours identical to last week. THREE 3D FLIPS, all hairline: HYG red -> GREEN at exactly +0.00, IWF green -> RED at exactly -0.00, XLRE green -> RED at -0.04. ⚠️ HYG +0.00 prints GREEN while IWF -0.00 prints RED — a live restatement of the rule that colour must never be inferred from a rounded margin. 3D-vs-weekly disagreement widened to 10 of 39 (EEM, MCHI, EWH, SOXX, GLD, GLTR, HYG, IWF, XLRE, UUP) = 74% agreement, DOWN from 85% at wk19 and the lowest since the 3D series began. The parallel-validation flag is still set on every row; note that hull3d history was being overwritten each run until build 869 switched to upsert, so the 4-week validation clock has not actually started",
+      hull_setbk: "SETBK (^SET.BK) returned to the board this week at close 1588.22, margin +0.74 GREEN, not a near-flip — 8th strongest weekly reading of 39, above SOXX, SPY and GSPC. It was null last week (coverage 0.974). ⚠️ SETBK IS NOT MAPPED TO ANY TRACKER ASSET: TICKER_MAP sends `thailand` to THD, which reads +0.12 green near-flip. The 0.62-point gap between the two is composition, not noise — SETBK carries DELTA at roughly a tenth of the index while THD tracks MSCI Thailand. Do not read SETBK as the thailand tile and do not substitute one for the other (§6.2)",
+      xbi_unmapped_correction: "CORRECTION to the standing unmapped[] note: XBI has been described as 'a theme he names with no asset'. That is now only half true. XBI has NO tracker asset id, but it HAS had a Hull read in board.json since the 39-ticker universe landed, and this week it is the strongest name on the entire board at +1.23 weekly / +1.10 3D. Same applies to XLP, XLI, UUP, TLT, VYM, IAI, URTH, EFA, GSPC, SETBK — 11 of the 39 pipeline tickers are computed every run and have no tile. unmapped[] means 'no tile', not 'no data'",
+      positioning: "⚠️ THE LONG LIST IN 'On Positioning' IS THE CONSENSUS, NOT HIS BOOK. Verbatim: 'investors positioned for a) rising EPS, b) capped bond yields, c) run-it-hot on Main St & too big to fail on Wall St policies; assets allocated long stocks (with global barbell of long US & long Asia/EM, sector barbell of long tech & long financials/industrials), long IG bonds, short government bonds & US dollar'. That entire clause describes where the crowd is. His own position appears only in the final sentence: 'WE long gold & commodities (GNR) to hedge policy & political risks to consensus AA'. Reading the consensus list as his recommendations is the same mis-read as wk18's 'long hubris' — the crowd he describes is the crowd he hedges against",
+      ai_spread: "The Biggest Picture, verbatim: 'since bonds bossing bubble (not vice versa), underperformance of AI spenders (MAGS) & AI builders (SOX) vs. AI adopters (XLV, XLF) ends only once GT30 yields sub-5%'. This is a DIRECTIONAL statement with a datable condition: builders keep underperforming adopters until the 30-year goes below 5%. It names XLV and XLF on the winning side. It is NOT a first-person position, so it is recorded as VIEW, not LONG. ⚠️ CONFLICT LOGGED: he named SHORT financials in wk19 as the midterm hedge and does NOT restate or withdraw it here, while naming XLF as an outperformer in this sentence. A stated position outranks a directional mention, so the sec_financials badge stays SHORT (carried 1w) and this sentence is filed in mentions[]. Do not silently resolve this in either direction",
+      policy: "Central banks shifting from cuts to hikes: past three months 12 cuts vs 13 HIKES, with Korea's second consecutive hike singled out. BofA forecasts 17 hikes vs 4 cuts to year end. UST buyback program ends Nov 4th, one day after the midterms. His conclusion: this phase of quasi-QE/YCC is 'likely to reduce US dollar allocations and increase gold allocations' — which is the mechanism behind the long-gold call, stated as a forecast rather than a recommendation",
+      politics: "Trump economic approval 35% and inflation approval 28%, both slumping again (Chart 6). Polymarket: GOP Senate/DEM House 48%, GOP Senate DEM House 38%, GOP sweep 11%, DEM sweep 1%. Contrarians 'await one of two big opportunities to flip risk-off': 1. US-Iran capitulation and last leg down in oil price, 2. US midterms if GOP lose Senate & Texas Governor. Note 'contrarians await' is third-person and conditional — filed as a mention, not a call",
+      private_clients: "$4.7tn AUM, 66.2% stocks (from 66.5%), 17.2% bonds (from 16.9%), 9.4% cash still at the record low. Equity ETF share count +0.8% past 4 weeks, +7.0% YTD. Past 4 weeks: BIGGEST INFLOWS TO BONDS SINCE MAY — buying IG bond, municipal and TIPS ETFs; SELLING utility, healthcare and REIT ETFs. ⚠️ They are now selling two of Hartnett's own longs (healthcare is not his but real estate is) while he stays long REITs. Chart 12 ranks utilities as the single largest 4-week outflow and IG the largest inflow",
+      tape: "Scores on the Doors YTD: oil +44.3%, international stocks +15.6%, SPX +12.6%, GOLD +5.9%, HY +2.7%, cash +2.4%, US$ +0.8%, IG +0.2%, govt bonds -1.1%, bitcoin -9.3%. Gold has run -2.3% -> +1.0% -> +4.0% -> +5.9% over four weeks with flows accelerating into the biggest print since Oct'25. Bitcoin has recovered -27.9% -> -16.9% -> -9.3% in three weeks, the fastest move on the table, and crypto flow is also the biggest since Oct'25. Table 6 detail: Korea equities +90.3% and Taiwan +62.6% are the top two country returns YTD; China -7.4% and India -8.3% are the bottom two. Zeitgeist quotes: 'In this world nothing is certain, except death, taxes, and quantitative easing' and 'Nvidia is the new Blackstone'",
+    },
+  },
+  // ── Week 21: Sep 4 ★ LATEST SEED ── "Let them eat data"
+  // Edition 03 Sep 2026 · EPFR week ended 9/2 · row labeled Fri 2026-09-04.
+  {
+    date: "2026-09-04",
+    title: "Let them eat data",
+    bb: 9.6, pcRatio: null, skew: 151.58, vix: 14.53, emOutflow4wk: 0.6, cashLevel: 3.5,
+    flows: {
+      em: -0.2, em_total: -0.2, china_stocks: -0.8, em_china: -0.8,
+      em_brazil: -1.4, em_india: -0.2, hk: null, thailand: null,
+      global_stocks: 2.8, japan_stocks: 1.4, europe_stocks: 0.8,
+      sox: null, ustech: null,
+      gold: 3.2, precious_metals: 3.2, bonds: 18.3, crypto: 0.5, ig_bonds: 9.2,
+      us_largecap: -3.1, us_value: -0.6, us_smallcap: -2.6, us_growth: -3.3,
+      sec_tech: -1.5, sec_comsvs: 0.02, sec_financials: -0.9, sec_hcare: 0.8,
+      sec_utilities: 0.006, sec_consumer: -0.3, sec_realestate: -0.007,
+      sec_energy: 0.9, sec_materials: 0.9,
+    },
+    hullSignals: {
+      global_stocks: "green", japan_stocks: "green", europe_stocks: "green",
+      em: "green", em_total: "green", china_stocks: "green", em_china: "green",
+      em_brazil: "red", em_india: "green", hk: "red", thailand: "green",
+      sox: "green", ustech: "green", sec_tech: "green",
+      gold: "red", precious_metals: "red", bonds: "red", ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green", us_smallcap: "green", us_growth: "green", us_value: "green",
+      sec_comsvs: "red", sec_financials: "green", sec_hcare: "green",
+      sec_utilities: "red", sec_realestate: "green", sec_energy: "green",
+      sec_materials: "green", sec_consumer: "green",
+    },
+    hull3dSignals: {
+      global_stocks: "green",
+      japan_stocks: "green",
+      europe_stocks: "green",
+      em: "red",
+      em_total: "red",
+      china_stocks: "green",
+      em_china: "green",
+      em_brazil: "green",
+      em_india: "green",
+      hk: "green",
+      thailand: "red",
+      sox: "red",
+      ustech: "red",
+      sec_tech: "red",
+      gold: "green",
+      precious_metals: "green",
+      bonds: "red",
+      ig_bonds: "red",
+      crypto: "green",
+      us_largecap: "green",
+      us_smallcap: "green",
+      us_growth: "red",
+      us_value: "green",
+      sec_comsvs: "green",
+      sec_financials: "green",
+      sec_hcare: "green",
+      sec_utilities: "red",
+      sec_realestate: "red",
+      sec_energy: "green",
+      sec_materials: "green",
+      sec_consumer: "red",
+    },
+    estFlags: {},
+    volAux: {
+      gvz: { value: 26.63, asOf: "2026-09-04", src: "board.json — 58.7%ile, third straight weekly fall from 67.5 -> 61.1 -> 58.7 while gold flow stays positive for a 9th week" },
+      vxn: { value: 20.04, asOf: "2026-09-04", src: "board.json — 15.5%ile, down again from 20.2%. NDX vol keeps compressing in the same week tech took its biggest outflow since Jun'26" },
+      vvix: { value: 84.42, asOf: "2026-09-04", src: "board.json — 2.4%ile, up from 0.8%ile but still effectively at the floor of the 52wk range" },
+      ovx: { value: 44.96, asOf: "2026-09-04", src: "board.json — 42.5%ile. Oil now +59.0% YTD, up from +44.3%, still the top single asset on Scores on the Doors" },
+      note: "⚠️ REVERSAL OF LAST WEEK'S FINDING: VXEWZ and VXEFA are BACK in board.json — but at asof 2026-07-17, i.e. 49 days stale. Last week they were null; the week before, stale at the same date. They did not refresh, they reappeared. Handled as stale:true (shown, excluded from Put Radar), not as fresh. ⚠️ NOTE THE PERCENTILE MOVED WITHOUT THE PRICE: VXEFA close is identical at 16.58 but its 52wk percentile went 20.6 -> 49.6 because the trailing window rolled. A percentile on a frozen quote is not a current reading — do not treat 49.6 as information. VXEEM / VXFXI / VXHYG / RVX remain null.",
+    },
+    srcNotes: {
+      bb: "9.7 -> 9.6, first fall in three weeks. Verbatim driver: TECH OUTFLOWS, partially offset by stronger global stock market breadth. Positioning still 'extreme bull territory'. Components: HF Positioning 85% V.Bullish (was 84), Equity Flow 84% V.Bullish (was 92 — the big mover), Bond Flow 65% NEUTRAL (unchanged), Credit Market Technicals 77% Bullish (unchanged), Global Stock Index Breadth 83% V.BULLISH (was 77% Bullish — upgraded a tier), FMS Positioning 100% V.Bullish. 'Old' B&B 7.9 (from 8.1). ⚠️ THE SCORECARD MOVED FOR A FOURTH CONSECUTIVE WEEK ON THE SAME 26 MAY SIGNAL: SPX +2.0% / ACWI +1.9%, versus +2.8%/+3.3% last week, +1.6%/+1.3% the week before, +4%/+3% before that. Four different numbers, four weeks, one signal, one start date. This is now a documented pattern, not an anomaly — the weekly restatement carries no information and the base rate is the only durable figure",
+      emOutflow4wk: "EM Flow Trading Rule prints -0.6% NEUTRAL (Table 5), from -0.1% last week. Stored as +0.6 per the outflow-sign convention (printed x -1). Second consecutive live print after five missing editions. Direction of travel is toward the 3.0 buy threshold but it is still five times away from it. Verdict for hk/em/thailand/em_total stays WAIT. ⚠️ EM_RULE.expires 2026-09-17 is now thirteen days out; when emRuleActive() turns false the branch changes but the answer does not, because 0.6 does not clear 3.0 either way",
+      cashLevel: "3.5% — UNCHANGED from last week, second consecutive live print, signal Sell (Table 5). The wk18 pre-registered trigger stays HALF met for a second week: cash is below 3.6%, the FMS equity-allocation number is STILL not printed. Two live cash prints in a row without the companion figure. Do not infer it from GWIM equity 66.1% — different survey (§6.2)",
+      rules_tools: "Table 5 in full, second complete set in a row: B&B 9.6 SELL (1-3 months) · FMS Cash 3.5% SELL (4 weeks) · Global Breadth Rule 63.6% NEUTRAL (3 months) · Global Flow Trading Rule 0.3% NEUTRAL (8 weeks) · EM Flow Trading Rule -0.6% NEUTRAL (8 weeks) · Global EPS Growth Model 9% EPS GROWTH RISING. ★★ THE BREADTH RULE COLLAPSED 81.8% -> 63.6% IN ONE WEEK — an 18-point fall, by far the largest single-week move in any Rules & Tools line in this seed. It moves AWAY from the >88% sell trigger and toward the buy side. ⚠️ NOTE THE INTERNAL CONTRADICTION IN HIS OWN NOTE: the B&B component 'Global Stock Index Breadth' was UPGRADED to 83% V.Bullish and is named as the thing offsetting tech outflows, while the standalone Breadth Rule fell 18 points. These are two different constructions of breadth pointing opposite ways in the same edition. There is no breadth table (Table 1 is the Senate map this week) to adjudicate. Recorded, not resolved",
+      breadth_rule: "63.6% (sell needs >88%) NEUTRAL. No country-level breadth table published this week — Table 1 is the Senate map — so there is NO reading for Thailand, Hong Kong or China this week. Last week's country reads (Thailand Neutral below 50dma, HK Extended, China Neutral below 200dma) are NOT carried forward: sourced or null. From Table 8 instead, deviation vs 200dma: Hong Kong +1.4%, China -5.0%, India -1.8%, EM Equities +8.7%. China is still the most oversold major market on the board versus its own trend",
+      flows_pct: "Table 4 Wk %AUM: Total EM -0.2, China -0.8, Brazil -1.4, India -0.2, Total DM 0.0, US 0.0, Europe 0.0, Japan +0.1, International +0.1. ★ CHINA -0.8% IS AN EIGHT-FOLD DEEPENING from -0.1%, and BofA labels it the FIFTH consecutive week of outflows — which retroactively confirms wk17 was also negative, a question this seed could not previously answer. The ไม้ v2.2 3-week flow-out window on china_stocks stays complete and is now widening, not healing. BRAZIL REVERSES HARD to -1.4% after last week's +0.4%, one month before the Oct 4 election",
+      flows_reconciled: "★ FIRST FULLY CLEAN SINGLE-WEEK RECONCILIATION IN THIS SEED — every Table 4 line checks, none required a two-week fallback: US 429,230 -> 423,338 = -5,892mn vs printed -$5.9bn ✓ · Japan 24,244 -> 25,605 = +1,361mn vs +$1.4bn ✓ · Europe -16,449 -> -15,603 = +846mn vs +$0.8bn ✓ · China -202,061 -> -207,320 = -5,259mn vs printed -$5.3bn ✓ · India -10,761 -> -10,931 = -170mn at -0.2% ✓ · Total EM -44,857 -> -50,248 = -5,391mn vs printed -$5.4bn ✓ · Total Equities 820,678 -> 823,520 = +2,842mn vs $2.8bn ✓ · ETFs 1,191,747 -> 1,198,892 = +7,145mn vs $7.1bn ✓ and long-only -370,983 -> -375,272 = -4,289mn vs $4.3bn from mutual funds ✓ · Brazil 3,392 -> 3,047 = -345mn at -1.4% implies ~$24.6bn AUM vs ~$21.8bn implied last week, consistent with Brazil equities re-rating from +14.1% to +21.8% YTD ✓. Additivity holds: DM +8,232 plus EM -5,391 = +2,841 vs Total Equities +2,842 (rounding) ✓",
+      source_date_defect: "⚠️ DEFECT IN THE SOURCE PDF, NOT IN THIS SEED. The Table 3 footnote reads '*week ended 8/26/2026' — byte-identical to last week's edition. But every YTD line in Tables 3 and 4 moved, and Tables 7 and 8 are both stamped 'as of 2 September 2026'. The footnote is a stale copy-paste in the BofA document; the correct EPFR week is ended 9/2. The row is labeled 2026-09-04 (Friday) per the standing convention. Flagged because a footnote that says the data did not move, next to data that did, is exactly the shape of the wrong-year OAS incident — it passes a shape check and fails an identity check",
+      flows_notable: "Weekly: $30.0bn to CASH, $18.3bn bonds, $3.2bn gold, $2.8bn stocks, $0.5bn crypto. ★ CASH IS THE LARGEST DESTINATION BY A FACTOR OF TEN OVER EQUITIES. Equities $2.8bn = SMALLEST INFLOW OF THE PAST NINE WEEKS (Chart 10). Tech -$1.5bn = BIGGEST OUTFLOW SINCE JUN'26 (Chart 11) and the named cause of B&B falling. China -$5.3bn = 5th straight outflow week. Financials -$0.9bn = 5th straight. Bank loans -$0.6bn = 1st outflow in 13 weeks, biggest since Mar'26. HY bond inflows RESUME at +$1.5bn after last week's first outflow in six. IG 22nd straight week (+$9.2bn), Treasuries 10th (+$6.2bn), bonds 71st, TIPS 31st, munis 20th, precious metals 9th. Crypto +$0.5bn on the week but $5.5bn over five weeks, biggest since Oct'25, cumulative $101bn since 2020",
+      flows_style_sector: "★ BY STYLE, ALL FOUR BUCKETS ARE NEGATIVE: US growth -$3.3bn, US large cap -$3.1bn, US small cap -$2.6bn, US value -$0.6bn. Last week small cap was the only positive line; this week it is the third-largest outflow. ⚠️ THAT MATTERS BECAUSE HE RESTATED RTY AS A LONG IN THE SAME EDITION — his own duration basket is being sold. By sector INFLOWS: materials +$0.9bn, energy +$0.9bn, HEALTHCARE +$0.8bn (reverses three straight outflow weeks), com svs +$20mn, utilities +$6mn. OUTFLOWS: tech -$1.5bn, financials -$0.9bn, consumer -$0.3bn, real estate -$7mn. Note real estate at -$7mn is a rounding-scale outflow but still negative, so it holds a 4th consecutive negative week and the flow-out window on sec_realestate stays complete while he stays long REITs",
+      bonds_field_defect: "⚠️ CARRIED, NOT FIXED (second week logged). The `bonds` field is labelled 'HY Bonds' with proxy HYG but stores the TOTAL bond headline (18.3 this week). Actual HY print is +$1.5bn, inflows resuming. Renaming requires a NEW field plus a version bump; an in-place redefinition would give one field two meanings across 21 weeks",
+      vix: "^VIX 14.53 @2026-09-04, 5.2%ile — essentially flat on the week (14.51 -> 14.53) but the percentile ticked up from 4.4%. VVIX 84.42 at 2.4%ile, up from 0.8%ile, still the floor. ⚠️ SKEW WENT UP AGAIN, THIRD CONSECUTIVE WEEK: 9.1 -> 46.8 -> 80.6 -> 87.7%ile. Spot vol pinned at the bottom of its range for a fourth week while tail pricing sets a new high for the series. Note also that hedge funds shorting VIX was named a B&B driver last week and B&B fell this week on tech outflows, not on that component unwinding",
+      skew: "151.58 @2026-09-04, 87.7%ile — a new high for this seed. Three straight weekly rises: 143.9 -> 149.77 -> 151.58, percentile 46.8 -> 80.6 -> 87.7. The index made highs across all three weeks",
+      pcRatio: "null — Cboe equity put/call still unsourced, board reports STALE_2529d_source_is_archive (asof 2019-10-04). Eighth consecutive week. Standing accepted null",
+      hull: "board.json asof 2026-09-04 VERBATIM (generated 2026-09-06T10:46:18Z, coverage 1.0, rows 157, 39 tickers, build_weekly 869). ★ ONLY ONE MAPPED WEEKLY FLIP: MCHI -0.02 RED -> +0.04 GREEN. china_stocks and em_china turn green on the weekly leg in the same week China posts its biggest outflow of the run at -0.8%. Price and flow have now fully separated on China. SIX mapped 3D flips: XLK green -> RED (-0.05), THD green -> RED (-0.02), XLY green -> RED (-0.06), HYG green -> RED (-0.02, flipping back after one week at +0.00), EWZ red -> GREEN (+0.14), XLC red -> GREEN (+0.00). ⚠️ XLC +0.00 prints GREEN this week while HYG -0.02 prints RED and last week HYG +0.00 printed GREEN — a third consecutive live demonstration that colour must be read from the field, never inferred from a rounded margin. 3D-vs-weekly agreement fell again: 24 of 39 = 62%, from 74% and 85%. Lowest of the series for a second straight week",
+      hull_notable: "XLK 3D turning red is the single most consequential price change on the board: it is the fast leg on the only sector he upgraded this week, and it arrives in the same edition as tech's biggest outflow since Jun'26. SOXX 3D deepened to -0.97 from -0.72 while SOXX weekly stayed green — the semis divergence is widening, not resolving. XBI is the strongest name on the board for a second week (+1.26 weekly / +1.01 3D) and he names XBI explicitly in his duration basket, but XBI still has no tracker tile. SETBK +0.76 weekly / +0.47 3D, both green, close 1595.58 — but SETBK is not the thailand tile; THD is, and THD's 3D just flipped RED (+0.04 -> -0.02) while its weekly stayed green at +0.08. The two Thailand reads now disagree with each other AND across legs",
+      hartnett_calls: "Explicit first-person this week: 'stay long commodities & debasement hedges, e.g. gold' (LONG gold, LONG commodities) and 'we say best hedge for DEM sweep is SHORT FINANCIALS & US DOLLAR' — which RESTATES the wk19 short and thereby RESOLVES last week's logged conflict, where XLF had been named an AI adopter without the short being withdrawn. The short stands. 'why duration (RTY, XBI, KRE, REIT) keeps working' restates the ABB duration basket, so us_smallcap and sec_realestate are re-badged LONG rather than left to carry. ⚠️ 'nouveau-leveraged Mag7 on cusp of upside breakout' REVERSES the wk20 VIEW − on Mag7/AI spenders after a single week. Recorded as VIEW + on ustech only, because he named Mag7, not the tech sector; sec_tech and sox are left to carry their wk20 VIEW − since he did not restate them. That produces a deliberate ustech VIEW + / sec_tech VIEW − split which is what the words support — it is not an error to be smoothed over",
+      politics: "The edition is largely a midterm note. Polymarket now: DEM sweep 50% (from 1% in the wk20 chart read — the series he plots is a different construction, do not difference them), GOP Senate/DEM House 35%, GOP sweep 10%. Trump approval 35-40% vs the 53% historical average two months before midterms since FDR. His conditional map, verbatim: DEM sweep = big risk-off, stocks slump >10%, US dollar and bond yields down into year-end, international outperforms, EUROPE OUTPERFORMS ASIA (loses Trump AI friend); GOP sweep = big risk-on and positive dollar; GOP Senate + DEM House = 'gridlock = goldilocks'. All three are conditional scenarios, not positions — only the DEM-sweep hedge (short financials & dollar) is stated in the first person",
+      policy: "'99% probability ECB hikes Sept 10th, 53% Fed hikes on 16th, 98% BoJ hikes 18th' per Bloomberg futures pricing. His read: 'we say Fed hike with stalled payrolls = credibility & peak yields... why duration (RTY, XBI, KRE, REIT) keeps working'. Maginot lines named explicitly: $4/gallon gas, 160 dollar-yen, 5% UST yield. 'lower Q4 yields good contrarian play' — a duration call with no tracker tile; TLT has a Hull read (-0.38 weekly / -0.20 3D, both red) but no asset id",
+      private_clients: "$4.7tn AUM, 66.1% stocks (from 66.2%), 17.2% bonds, 9.4% cash still at record low. ★ BIGGEST WEEKLY OUTFLOW FROM EQUITIES SINCE OCT'25 (Chart 9). Equity ETF share count DOWN 0.1% on the week, +6.9% YTD (from +7.0%). Past 4 weeks buying IG bond, municipal, TIPS and now HY bond ETFs; selling staples, healthcare and energy ETFs. ⚠️ They are selling healthcare in the same week healthcare took its first sector inflow in four weeks — retail private clients and institutional fund flow are pointing opposite ways on the same sector",
+      tape: "Scores on the Doors YTD: oil +59.0% (from +44.3%), global stocks +15.1%, US stocks +13.2%, GOLD +3.8% (DOWN from +5.9%), HY +2.5%, cash +2.5%, US dollar +0.7%, IG -0.5%, govt bonds -1.4%, bitcoin -7.0%. ⚠️ GOLD FELL 5.9% -> 3.8% YTD in a week that took a 9th straight inflow — flow and price separated. Commodities +72.1% YTD is now the top line of the entire quilt. Table 7 country detail: Korea +85.2%, Taiwan +63.6% top; China -9.0% and India -9.1% bottom, both deeper than last week",
     },
   },
 ];
@@ -1679,6 +1963,62 @@ const HARTNETT_CALLS = {
     mentions: [
       "\u201csecular consensus is long AI\u201d — the crowd he is fading, not his own position",
       "\u201cshould Trump hold Senate & Abbott hold Texas, expect stocks (esp. AI) to rip\u201d — conditional, not a call",
+    ],
+  },
+
+  "2026-08-28": {
+    edition: "28 Aug 2026 · Investing with Pleasure",
+    calls: {
+      gold:         { side: "LONG", note: "\u201cwe long gold & commodities (GNR) to hedge policy & political risks to consensus AA\u201d \u00b7 first-person, unambiguous" },
+      sec_materials:{ side: "LONG", note: "same sentence \u2014 \u201cwe long gold & COMMODITIES (GNR)\u201d. GNR is a natural-resources ETF; XLB is the closest mapped proxy and is a PARTIAL match, not the same basket \u2014 direction yes, composition no" },
+      sox:          { side: "VIEW \u2212", note: "\u201cunderperformance of AI spenders (MAGS) & AI builders (SOX) vs. AI adopters (XLV, XLF) ends only once GT30 yields sub-5%\u201d \u2014 a named direction with a datable condition, not a stated short" },
+      ustech:       { side: "VIEW \u2212", note: "same sentence \u2014 MAGS/SOX on the losing side of the spread until GT30 sub-5%" },
+      sec_tech:     { side: "VIEW \u2212", note: "same sentence as ustech" },
+      sec_hcare:    { side: "VIEW +", note: "XLV named as an AI ADOPTER on the outperforming side of the same spread. Direction only \u2014 he does not say he is long it. \u26a0\ufe0f Healthcare flow is -$1.1bn, its biggest outflow since Mar'26, and private clients are selling healthcare ETFs" },
+    },
+    unmapped: [
+      "commodities / natural resources (GNR) \u2014 LONG, explicit this week",
+      "MAGS (AI spenders) \u2014 VIEW \u2212, no tile and no Hull read",
+      "biotech (XBI) \u2014 no tile, BUT Hull reads +1.23 wk / +1.10 3D, strongest on the board",
+      "regional banks (KRE) \u2014 no tile, no Hull read",
+      "AI bonds \u2014 SHORT, carried from wk18/wk19",
+      "IXG global financials \u00b7 XBD broker dealers \u2014 cited as evidence, not as trades",
+      "PSP \u2014 still his nominated policy-failure gauge, still not in the universe",
+    ],
+    mentions: [
+      "\u26a0\ufe0f \u201cAI adopters (XLV, XLF)\u201d names XLF on the OUTPERFORMING side while the wk19 \u201cwe hedge via short financials\u201d is neither restated nor withdrawn. Position outranks view: badge stays SHORT, conflict recorded here rather than silently resolved",
+      "\u201cassets allocated long stocks...long IG bonds, short government bonds & US dollar\u201d \u2014 this is the CONSENSUS he hedges against, not his book",
+      "\u201ccontrarians note risk indices grinding higher without leadership, await two coming events to flip risk-off\u201d \u2014 third person and conditional",
+      "\u201cNvidia is the new Blackstone\u201d \u2014 Zeitgeist quote, not a call",
+      "\u201cshould this thread credibility needle then risk-on and even US$ rallies\u201d \u2014 conditional scenario on Warsh, both branches stated",
+    ],
+  },
+
+  "2026-09-03": {
+    edition: "03 Sep 2026 \u00b7 Let them eat data",
+    calls: {
+      gold:          { side: "LONG", note: "\u201cstay long commodities & debasement hedges, e.g. gold\u201d \u2014 first-person imperative, restated" },
+      sec_materials: { side: "LONG", note: "same sentence \u2014 \u201cstay long COMMODITIES\u201d. XLB is a partial proxy for the commodity complex, not the same basket. Commodities +72.1% YTD is the top line of the whole quilt" },
+      us_smallcap:   { side: "LONG", note: "\u201cwhy duration (RTY, XBI, KRE, REIT) keeps working\u201d \u2014 RTY restated in the ABB duration basket. \u26a0\ufe0f US small cap took -$2.6bn OUT this week, the 3rd-largest style outflow" },
+      sec_realestate:{ side: "LONG", note: "same sentence \u2014 REIT restated. \u26a0\ufe0f 4th consecutive negative flow week (-$7mn, rounding-scale but negative) and XLRE 3D still red" },
+      sec_financials:{ side: "SHORT", note: "\u201cwe say best hedge for DEM sweep is SHORT FINANCIALS & US dollar\u201d \u2014 explicit, first-person. RESOLVES the wk20 conflict where XLF was named an AI adopter without the short being withdrawn. The short stands. Price disagrees: XLF +0.97 weekly / +0.54 3D, both green" },
+      ustech:        { side: "VIEW +", note: "\u201cnouveau-leveraged Mag7 on cusp of upside breakout\u201d. \u26a0\ufe0f REVERSES the wk20 VIEW \u2212 on AI spenders after ONE week. Direction only, no position stated. \u26a0\ufe0f Arrives the same week tech takes its biggest outflow since Jun'26 (-$1.5bn) and XLK 3D flips RED" },
+    },
+    unmapped: [
+      "commodities complex \u2014 LONG, restated; +72.1% YTD, top of the quilt",
+      "biotech (XBI) \u2014 named in the duration basket. No tile. Hull +1.26 wk / +1.01 3D, strongest on the board for a 2nd week",
+      "regional banks (KRE) \u2014 named in the duration basket. No tile, no Hull read",
+      "SHORT US DOLLAR \u2014 explicit hedge alongside short financials. No tile; UUP has a Hull read (+0.11 wk / -0.04 3D)",
+      "\u201clower Q4 yields good contrarian play\u201d \u2014 long-duration UST call. No tile; TLT reads -0.38 wk / -0.20 3D, both red",
+      "MAGS (Mag7) \u2014 the actual subject of the VIEW + above; ustech is the closest tile, not the same basket",
+      "PSP \u2014 nominated policy-failure gauge, still not in the universe",
+    ],
+    mentions: [
+      "\u201cDEM sweep = big risk-off... slump in stocks (>10%), US dollar, bond yields into year-end\u201d \u2014 conditional scenario, not a forecast he takes a position on beyond the named hedge",
+      "\u201cEurope outperforms Asia (loses Trump AI friend)\u201d \u2014 conditional on DEM sweep. NOT a standing europe_stocks or hk call",
+      "\u201cGOP sweep = big risk-on\u201d \u00b7 \u201cGOP Senate, DEM House = gridlock = goldilocks\u201d \u2014 the other two branches, both stated",
+      "\u201cnegative long-run returns great entry points\u201d (stocks 1939/1974/2009, commodities 1933/2018) \u2014 historical analogy supporting the commodity long, not a fresh call",
+      "\u26a0\ufe0f sox and sec_tech are NOT restated this week and carry VIEW \u2212 from wk20, producing a deliberate ustech VIEW + / sec_tech VIEW \u2212 split. He named Mag7, not the tech sector \u2014 the split is what the words support",
     ],
   },
 };
@@ -2784,15 +3124,17 @@ function HartnettTrackerPutV2() {
 
       {/* Playbook — seed edition (wk11). Update via structural regen only if you want it week-fresh. */}
       <div style={{ marginTop: 22, background: "#F6EBD9", border: "1px solid #E2D3B8", borderRadius: 6, padding: "13px 15px" }}>
-        <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginBottom: 10 }}>HARTNETT PLAYBOOK (AUG 20 · WK ENDED 08/19) · "STEEL CAGE MATCH...BESSENT vs ABB" · B&B BACK UP TO 9.5 · FIRST EXPLICIT SHORT IN FIVE EDITIONS</div>
+        <div style={{ fontSize: 7, color: "#111111", letterSpacing: ".15em", marginBottom: 10 }}>HARTNETT PLAYBOOK (SEP 3 · WK ENDED 09/02) · "LET THEM EAT DATA" · B&amp;B 9.6 FIRST FALL IN THREE WEEKS · BREADTH RULE COLLAPSES 81.8% → 63.6% · MIDTERM NOTE</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(168px,1fr))", gap: 7 }}>
           {[
-            { theme: "★ B&B reverses UP to 9.5", play: "9.3 -> 9.5 on stronger breadth and bullish positioning in S&P500 AND GOLD FUTURES. BofA positioning reads 'extreme bull'. Last week's decline did not continue. ⚠️ His scorecard for the SAME signal shrank in one week: SPX since 26 May now +1.6% (he printed +4% last week), ACWI +1.3% (was +3%). That is a restatement, not a market move — trust the base rate, not the weekly number", color: "#F43F5E" },
-            { theme: "★ Short financials — first named short", play: "'Contrarian US midterms trade...we hedge via short financials', and in the failure case 'short cyclicals (financials) into midterms'. FLOW AGREES: financials -$2.0bn, biggest outflow in 11 weeks, and private clients are selling financial ETFs. PRICE DOES NOT: XLF Hull weekly +0.94, the strongest sector on the board", color: "#F43F5E" },
-            { theme: "★ USD question answered in print", play: "wk18 was ambiguous and this tracker CARRIED the wk17 long-USD call rather than infer a reversal. wk19 states it: 'secular consensus is ABD Anything but the Dollar; WE AGREE'. The carried long-USD call is now SUPERSEDED by an explicit statement, not by inference. He still never says 'short dollar' — the trade he names is long gold. Dollar YTD has faded +1.7% -> +0.6% over three weeks", color: "#CA8A04" },
-            { theme: "Gold: 3D flips green, weekly still red", play: "GLD 3D -0.19 -> +0.22 and GLTR 3D -0.44 -> +0.04, while weeklies stay red (GLD -0.90, GLTR -1.34). Weekly improving three weeks straight: -1.42 -> -1.22 -> -0.90. Flow +$3.8bn, 7th straight week. Gold YTD -2.3% -> +1.0% -> +4.0%. ⚠️ BUT GVZ jumped 34.9 -> 67.5%ile in one week — gold vol is no longer cheap, so a vol-timed entry window has closed even as price improves", color: "#CA8A04" },
-            { theme: "Bessent puts = quasi-QE", play: "USD swap lines with Asia/Gulf, yen FX intervention, now DOUBLING long-bond buybacks with Fed acquiescence. Trigger: debt just crossed $40tn, $2tn net UST issuance in '26-'27, hyperscaler bonds now 9% of gross IG supply (1% in '24). His call: this CAPS but does not REDUCE yields. Failure case is explicit — if the 30Y will not go below 5%: dollar slump, short risk, short leverage (AI hyperscalers, private credit), short financials", color: "#6E6657" },
-            { theme: "Tail hedging woke up", play: "SKEW 138 -> 143.9, and 9.1%ile -> 46.8%ile in ONE WEEK — the largest percentile move on the vol board. VIX 14.25 -> 15.13 (2.8 -> 11.9%ile). VVIX still 4.0%ile. The index barely moved; someone is buying protection anyway", color: "#CA8A04" },
+            { theme: "\u2605\u2605 Breadth Rule collapses 81.8% \u2192 63.6%", play: "An 18-point fall in one week \u2014 by far the largest single-week move in any Rules & Tools line in this seed \u2014 and it moves AWAY from the >88% sell trigger toward the buy side. \u26a0\ufe0f BUT HIS OWN NOTE CONTRADICTS ITSELF: the B&B component \u2018Global Stock Index Breadth\u2019 was UPGRADED to 83% V.Bullish and is named as the thing offsetting tech outflows, in the same edition. Two constructions of breadth pointing opposite ways, and no country table this week (Table 1 is the Senate map) to adjudicate. Recorded, not resolved", color: "#CA8A04" },
+            { theme: "\u2605 China: price flips green, flow flips deeper red", play: "MCHI weekly -0.02 RED \u2192 +0.04 GREEN, the ONLY mapped weekly flip on the board. Same week China posts -0.8% \u2014 an eight-fold deepening from -0.1% and BofA\u2019s FIFTH straight outflow week, which retroactively confirms wk17 was negative too. The \u0e44\u0e21\u0e49 v2.2 flow-out window stays complete and is WIDENING, not healing. Price and flow have now fully separated on the one position actually held", color: "#F43F5E" },
+            { theme: "\u26a0\ufe0f Mag7 upgrade lands on a red 3D and a record outflow", play: "\u2018nouveau-leveraged Mag7 on cusp of upside breakout\u2019 REVERSES last week\u2019s VIEW \u2212 on AI spenders after ONE week. It arrives in the same edition as tech -$1.5bn, the biggest outflow since Jun\u201926 and the named cause of B&B falling to 9.6 \u2014 and XLK\u2019s 3D flipped GREEN \u2192 RED. Badge is VIEW + on ustech only; sox and sec_tech carry VIEW \u2212 because he named Mag7, not the sector. The split is deliberate", color: "#F43F5E" },
+            { theme: "\u2605 Short financials RESTATED \u2014 wk20 conflict resolved", play: "\u2018we say best hedge for DEM sweep is SHORT FINANCIALS & US dollar\u2019 \u2014 explicit and first-person. Last week XLF was named an AI adopter on the winning side without the short being withdrawn, and that conflict was logged rather than smoothed. It is now settled: the short stands. \u26a0\ufe0f Price disagrees flatly \u2014 XLF +0.97 weekly / +0.54 3D, both green, and financials are in a 5th straight outflow week which agrees with him", color: "#CA8A04" },
+            { theme: "\u26a0\ufe0f His own duration basket is being sold", play: "\u2018why duration (RTY, XBI, KRE, REIT) keeps working\u2019 restates the ABB longs. But ALL FOUR US style buckets went negative this week \u2014 growth -$3.3bn, large cap -$3.1bn, SMALL CAP -$2.6bn, value -$0.6bn. Last week small cap was the only positive style line; this week it is the third-largest outflow. Real estate is negative a 4th straight week. XBI is the strongest name on the whole board (+1.26 / +1.01) and still has no tile", color: "#F43F5E" },
+            { theme: "Cash takes ten times what equities took", play: "$30.0bn to CASH vs $2.8bn to stocks \u2014 and $2.8bn is the SMALLEST equity inflow of the past nine weeks. Bonds $18.3bn, 71st straight week. IG 22nd week, Treasuries 10th, TIPS 31st, munis 20th. Private clients posted their biggest weekly equity outflow since Oct\u201925 with equity ETF share count DOWN on the week. The allocation is moving, quietly and in one direction", color: "#CA8A04" },
+            { theme: "Vol: SKEW sets a new high for the series", play: "SKEW 151.58 at the 87.7%ile \u2014 three straight rises: 46.8 \u2192 80.6 \u2192 87.7. VIX 14.53 at 5.2%ile, flat and pinned at the floor for a fourth week. VVIX 84.42 at 2.4%ile, off 0.8% but still the floor. Tail pricing keeps setting highs while spot vol does not move at all, across three weeks of index highs", color: "#6E6657" },
+            { theme: "Gold: flow up, price down, vol down", play: "9th straight week of precious-metal inflows (+$3.2bn) while gold YTD FELL from +5.9% to +3.8% and GVZ dropped a third straight week to the 58.7%ile. GLD is still weekly RED / 3D GREEN. He restated \u2018stay long commodities & debasement hedges, e.g. gold\u2019 \u2014 and commodities at +72.1% YTD is now the top line of the entire asset quilt, so the commodity leg is working even as the gold leg stalls", color: "#6E6657" },
           ].map((r, idx) => (
             <div key={idx} style={{ background: "#FFFBF2", borderRadius: 4, padding: "6px 8px", borderLeft: `2px solid ${r.color}` }}>
               <div style={{ fontSize: 7, color: r.color, fontWeight: 700, marginBottom: 2 }}>{r.theme}</div>
@@ -2804,16 +3146,16 @@ function HartnettTrackerPutV2() {
 
       {/* Catalysts calendar */}
       <div style={{ marginTop: 10, background: "#F6EBD9", border: "1px solid #CA8A0430", borderRadius: 6, padding: "13px 15px" }}>
-        <div style={{ fontSize: 7, color: "#CA8A04", letterSpacing: ".15em", marginBottom: 10 }}>ROAD MAP — HIS OWN PRINTED CALENDAR (Aug 20 edition) · NOTE: all probabilities are HIKE, not cut</div>
+        <div style={{ fontSize: 7, color: "#CA8A04", letterSpacing: ".15em", marginBottom: 10 }}>ROAD MAP — HIS OWN PRINTED CALENDAR (Sep 3 edition) · NOTE: all probabilities are HIKE, not cut</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 7 }}>
           {[
-            { date: "Aug 18", event: "August FMS — RELEASED, cash level STILL NOT PRINTED", risk: "⚠️ He cites 'Aug FMS' twice in this edition (Chart 3 midterm expectations, Chart 4 DEM-sweep reaction) so he has read the survey — but he does NOT print the cash level or the equity-allocation number. cashLevel therefore stays CARRIED at 3.6% for a sixth edition. The wk18 pre-registered read (cash below 3.6% + equity >52% OW = take profits) is UNRESOLVED, not answered. Do not infer it from the charts he did show", color: "#F43F5E" },
-            { date: "Aug 28 · 10am", event: "Warsh · Jackson Hole + BLS payroll revisions SAME HOUR", risk: "He needs Warsh 'just-hawkish-enough' to restore bond credibility WITHOUT torpedoing the dollar. Two market-moving releases in the same minute — the nearest live catalyst by far", color: "#F43F5E" },
-            { date: "Sep 4 / 16 / 18", event: "Payrolls · FOMC 35% · BoJ 74%", risk: "He now says the yen intervention 'needs to be backed up with meaningful BoJ rate hike on Sep 18th' to steady the JGB long end. The BoJ number is the highest on his calendar and the least discussed", color: "#CA8A04" },
-            { date: "Sep 24", event: "Trump-Xi summit", risk: "China's -2.1% collapse did not continue (-0.1% this week). He is still long HK property against the consensus. Summit is the event that resolves it", color: "#CA8A04" },
-            { date: "Oct 4", event: "Brazil election — Lula vs Bolsonaro", risk: "Brazil Wk %AUM -1.1%, negative a SECOND straight week and again the worst line on the table. EWZ Hull -0.72 weekly / -0.54 3D, no improvement. VXEWZ still stale at 7/17 = 35 days old with six weeks to the vote and no current IV read", color: "#F43F5E" },
-            { date: "Oct 28 / Nov 3", event: "FOMC 55% hike · US midterms", risk: "Aug FMS consensus: 56% expect DEM House / GOP Senate, only 28% a DEM sweep. He fades it via short financials. If DEMs take Senate AND GOP loses TX: stocks -10%+, dollar and yields down into year-end. Trump approval 39% overall, 36% economy, 30% inflation — all below pre-war averages", color: "#F43F5E" },
-            { date: "ongoing", event: "Maginot Lines · $4 gas · 160 JPY · 5% UST", risk: "Gasoline is ALREADY back above $4 with SPR at a 44-year low and crude days-of-supply at 40-50 year lows — the hardest line to hold. 5% on the 30Y is what he calls 'the Big One'. He nominates PSP (Private Equity ETF) as the tell for policy failure; PSP is NOT in the ticker universe, so there is no Hull read on his own failure gauge", color: "#6E6657" },
+            { date: "Sep 10 \u00b7 16 \u00b7 18", event: "ECB 99% \u00b7 Fed 53% \u00b7 BoJ 98% \u2014 all HIKE probabilities", risk: "Per Bloomberg futures pricing, printed verbatim. Three central bank hikes inside nine days. His read: \u2018we say Fed hike with stalled payrolls = credibility & peak yields\u2026 why duration (RTY, XBI, KRE, REIT) keeps working\u2019. Note the Fed at 53% is a coin flip \u2014 the one genuinely uncertain leg of the three", color: "#F43F5E" },
+            { date: "Sep 17", event: "EM_RULE expiry \u2014 13 days out, and moot", risk: "emRuleActive() turns false and hk/em/thailand/em_total stop taking the suspension branch. The answer does not change: the live EM Flow Trading Rule reads -0.6%, still five times away from the 3.0 buy threshold, so the verdict is WAIT either side of the date. Two live prints in a row have made this a sourced WAIT rather than an unevaluable one", color: "#6E6657" },
+            { date: "Sep 24", event: "Trump-Xi summit", risk: "China flow -0.8%, FIFTH straight outflow week and eight times deeper than last week. But MCHI weekly just flipped GREEN and MCHI 3D is green too. Price and flow have fully separated \u2014 the \u0e44\u0e21\u0e49 flow-out window is complete while both price legs say the opposite. China is also -5.0% below its 200dma, the most oversold major market on Table 8. The summit is the event that resolves which leg was right", color: "#F43F5E" },
+            { date: "Oct 4", event: "Brazil election \u2014 one month out", risk: "Brazil flow REVERSES HARD to -1.4% after +0.4%. But EWZ 3D flipped RED \u2192 GREEN (+0.14) and Brazil equities re-rated +14.1% \u2192 +21.8% YTD. \u26a0\ufe0f VXEWZ reappeared in board.json but at the SAME 2026-07-17 timestamp \u2014 49 days stale. There is still no current Brazil IV read one month before the vote", color: "#F43F5E" },
+            { date: "Nov 3", event: "US midterms \u2014 Polymarket DEM sweep now 50%", risk: "DEM sweep 50%, GOP Senate/DEM House 35%, GOP sweep 10%. Trump approval 35-40% vs a 53% historical average two months out since FDR. His conditional map: DEM sweep = big risk-off, stocks slump >10%, dollar and yields down, international outperforms, EUROPE OUTPERFORMS ASIA; GOP sweep = big risk-on; GOP Senate + DEM House = \u2018gridlock = goldilocks\u2019. Only the hedge is a position: short financials & US dollar. Senate map to watch: Ohio, Texas, Iowa, Michigan", color: "#F43F5E" },
+            { date: "Nov 4", event: "UST buyback program ENDS \u2014 one day after the vote", risk: "Unchanged from last edition and still the tightest calendar coupling in the note. Maginot lines named this week: $4/gallon gas, 160 dollar-yen, 5% UST yield. \u2018lower Q4 yields good contrarian play\u2019 is his duration call \u2014 no tracker tile; TLT reads -0.38 weekly / -0.20 3D, both red", color: "#CA8A04" },
+            { date: "ongoing", event: "GT30 sub-5% \u2014 dropped from this edition", risk: "\u26a0\ufe0f The one datable threshold he gave last week (AI builders underperform adopters until GT30 < 5%) is NOT restated here, and the Mag7 view reversed instead. A condition that disappears after one week without being marked resolved or abandoned is worth tracking as its own pattern \u2014 the same shape as the B&B scorecard restating itself four weeks running", color: "#6E6657" },
           ].map(r => (
             <div key={r.date + r.event} style={{ background: "#FFFBF2", borderRadius: 4, padding: "6px 8px", borderLeft: `2px solid ${r.color}` }}>
               <div style={{ fontSize: 9, color: r.color, fontWeight: 700, marginBottom: 2 }}>{r.date} · {r.event}</div>

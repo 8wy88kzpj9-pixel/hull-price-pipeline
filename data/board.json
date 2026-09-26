@@ -1,209 +1,209 @@
 {
- "asof": "2026-09-18",
- "generated_utc": "2026-09-20T11:11:42+00:00",
+ "asof": "2026-09-25",
+ "generated_utc": "2026-09-26T07:00:38+00:00",
  "coverage": 0.974,
  "rows": 157,
  "hull_weekly": [
   {
    "ticker": "SPY",
-   "close": 761.69,
-   "margin_pct": 0.48,
+   "close": 771.35,
+   "margin_pct": 0.45,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "ACWI",
-   "close": 159.29,
-   "margin_pct": 0.42,
+   "close": 161.05,
+   "margin_pct": 0.39,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "EEM",
-   "close": 67.03,
+   "close": 67.98,
    "margin_pct": 0.31,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "MCHI",
-   "close": 53.07,
-   "margin_pct": -0.06,
+   "close": 52.62,
+   "margin_pct": -0.12,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "EWZ",
-   "close": 37.52,
-   "margin_pct": -0.16,
+   "close": 36.82,
+   "margin_pct": -0.09,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "INDA",
-   "close": 48.02,
-   "margin_pct": 0.14,
+   "close": 47.86,
+   "margin_pct": 0.08,
    "color": "green",
    "near_flip": true
   },
   {
    "ticker": "EWH",
-   "close": 22.45,
-   "margin_pct": -0.08,
+   "close": 22.26,
+   "margin_pct": -0.12,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "THD",
-   "close": 72.26,
-   "margin_pct": 0.04,
+   "close": 73.53,
+   "margin_pct": 0.03,
    "color": "green",
    "near_flip": true
   },
   {
    "ticker": "SOXX",
-   "close": 533.07,
-   "margin_pct": 0.27,
+   "close": 572.68,
+   "margin_pct": 0.34,
    "color": "green",
-   "near_flip": true
+   "near_flip": false
   },
   {
    "ticker": "XLK",
-   "close": 189.6,
+   "close": 196.27,
    "margin_pct": 0.87,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "GLD",
-   "close": 401.17,
-   "margin_pct": -0.37,
+   "close": 393.41,
+   "margin_pct": -0.36,
    "color": "red",
    "near_flip": false
   },
   {
    "ticker": "GLTR",
-   "close": 199.34,
-   "margin_pct": -0.61,
+   "close": 194.63,
+   "margin_pct": -0.57,
    "color": "red",
    "near_flip": false
   },
   {
    "ticker": "HYG",
-   "close": 78.53,
-   "margin_pct": -0.07,
-   "color": "red",
-   "near_flip": true
-  },
-  {
-   "ticker": "LQD",
-   "close": 104.7,
-   "margin_pct": -0.25,
-   "color": "red",
-   "near_flip": true
-  },
-  {
-   "ticker": "BTCUSD",
-   "close": 80336.2812,
-   "margin_pct": 2.03,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "EWJ",
-   "close": 97.0,
-   "margin_pct": 0.54,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "VGK",
-   "close": 88.21,
-   "margin_pct": 0.23,
-   "color": "green",
-   "near_flip": true
-  },
-  {
-   "ticker": "IWM",
-   "close": 284.1,
-   "margin_pct": 0.26,
-   "color": "green",
-   "near_flip": true
-  },
-  {
-   "ticker": "IWF",
-   "close": 123.25,
-   "margin_pct": 0.35,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "IWD",
-   "close": 251.7,
-   "margin_pct": 0.62,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "XLC",
-   "close": 110.81,
-   "margin_pct": -0.05,
-   "color": "red",
-   "near_flip": true
-  },
-  {
-   "ticker": "XLF",
-   "close": 55.86,
-   "margin_pct": 0.78,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "XLV",
-   "close": 168.39,
-   "margin_pct": 0.85,
-   "color": "green",
-   "near_flip": false
-  },
-  {
-   "ticker": "XLU",
-   "close": 41.1,
-   "margin_pct": -0.7,
-   "color": "red",
-   "near_flip": false
-  },
-  {
-   "ticker": "XLRE",
-   "close": 42.53,
+   "close": 77.86,
    "margin_pct": -0.11,
    "color": "red",
    "near_flip": true
   },
   {
+   "ticker": "LQD",
+   "close": 103.21,
+   "margin_pct": -0.29,
+   "color": "red",
+   "near_flip": true
+  },
+  {
+   "ticker": "BTCUSD",
+   "close": 83907.8281,
+   "margin_pct": 2.29,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "EWJ",
+   "close": 97.93,
+   "margin_pct": 0.53,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "VGK",
+   "close": 88.63,
+   "margin_pct": 0.15,
+   "color": "green",
+   "near_flip": true
+  },
+  {
+   "ticker": "IWM",
+   "close": 281.97,
+   "margin_pct": 0.1,
+   "color": "green",
+   "near_flip": true
+  },
+  {
+   "ticker": "IWF",
+   "close": 126.25,
+   "margin_pct": 0.37,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "IWD",
+   "close": 251.93,
+   "margin_pct": 0.52,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "XLC",
+   "close": 112.96,
+   "margin_pct": 0.0,
+   "color": "green",
+   "near_flip": true
+  },
+  {
+   "ticker": "XLF",
+   "close": 54.84,
+   "margin_pct": 0.61,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "XLV",
+   "close": 170.7,
+   "margin_pct": 0.84,
+   "color": "green",
+   "near_flip": false
+  },
+  {
+   "ticker": "XLU",
+   "close": 39.51,
+   "margin_pct": -0.86,
+   "color": "red",
+   "near_flip": false
+  },
+  {
+   "ticker": "XLRE",
+   "close": 41.56,
+   "margin_pct": -0.27,
+   "color": "red",
+   "near_flip": true
+  },
+  {
    "ticker": "XLE",
-   "close": 64.31,
-   "margin_pct": 0.65,
+   "close": 62.04,
+   "margin_pct": 0.56,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "XLB",
-   "close": 49.99,
-   "margin_pct": -0.07,
+   "close": 49.8,
+   "margin_pct": -0.18,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "XLY",
-   "close": 111.03,
-   "margin_pct": -0.05,
+   "close": 110.56,
+   "margin_pct": -0.16,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "GSPC",
-   "close": 7650.5,
-   "margin_pct": 0.48,
+   "close": 7743.4102,
+   "margin_pct": 0.45,
    "color": "green",
    "near_flip": false
   },
@@ -216,64 +216,64 @@
   },
   {
    "ticker": "URTH",
-   "close": 206.77,
-   "margin_pct": 0.44,
+   "close": 208.73,
+   "margin_pct": 0.4,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "EFA",
-   "close": 104.97,
-   "margin_pct": 0.28,
+   "close": 105.56,
+   "margin_pct": 0.22,
    "color": "green",
    "near_flip": true
   },
   {
    "ticker": "XLP",
-   "close": 82.8,
-   "margin_pct": -0.1,
+   "close": 82.06,
+   "margin_pct": -0.17,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "XLI",
-   "close": 169.75,
-   "margin_pct": -0.15,
+   "close": 170.43,
+   "margin_pct": -0.26,
    "color": "red",
    "near_flip": true
   },
   {
    "ticker": "XBI",
-   "close": 156.72,
-   "margin_pct": 1.02,
+   "close": 155.03,
+   "margin_pct": 0.85,
    "color": "green",
    "near_flip": false
   },
   {
    "ticker": "UUP",
-   "close": 28.39,
-   "margin_pct": 0.09,
+   "close": 28.62,
+   "margin_pct": 0.12,
    "color": "green",
    "near_flip": true
   },
   {
    "ticker": "TLT",
-   "close": 81.25,
-   "margin_pct": -0.39,
+   "close": 79.32,
+   "margin_pct": -0.43,
    "color": "red",
    "near_flip": false
   },
   {
    "ticker": "VYM",
-   "close": 159.26,
-   "margin_pct": 0.23,
+   "close": 157.68,
+   "margin_pct": 0.11,
    "color": "green",
    "near_flip": true
   },
   {
    "ticker": "IAI",
-   "close": 184.8,
-   "margin_pct": 0.64,
+   "close": 180.88,
+   "margin_pct": 0.45,
    "color": "green",
    "near_flip": false
   }
@@ -281,7 +281,7 @@
  "hull3d": [
   {
    "ticker": "SPY",
-   "margin_pct": 0.0,
+   "margin_pct": 0.05,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -290,7 +290,7 @@
   },
   {
    "ticker": "ACWI",
-   "margin_pct": 0.02,
+   "margin_pct": 0.06,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -299,11 +299,11 @@
   },
   {
    "ticker": "EEM",
-   "margin_pct": -0.05,
-   "color": "red",
+   "margin_pct": 0.03,
+   "color": "green",
    "near_flip": true,
    "weekly_color": "green",
-   "agree": false,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
@@ -317,7 +317,7 @@
   },
   {
    "ticker": "EWZ",
-   "margin_pct": 0.73,
+   "margin_pct": 0.71,
    "color": "green",
    "near_flip": false,
    "weekly_color": "red",
@@ -326,7 +326,7 @@
   },
   {
    "ticker": "INDA",
-   "margin_pct": -0.04,
+   "margin_pct": -0.09,
    "color": "red",
    "near_flip": true,
    "weekly_color": "green",
@@ -344,16 +344,16 @@
   },
   {
    "ticker": "THD",
-   "margin_pct": -0.06,
-   "color": "red",
+   "margin_pct": 0.03,
+   "color": "green",
    "near_flip": true,
    "weekly_color": "green",
-   "agree": false,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
    "ticker": "SOXX",
-   "margin_pct": -1.06,
+   "margin_pct": -0.63,
    "color": "red",
    "near_flip": false,
    "weekly_color": "green",
@@ -362,16 +362,16 @@
   },
   {
    "ticker": "XLK",
-   "margin_pct": -0.13,
-   "color": "red",
+   "margin_pct": 0.07,
+   "color": "green",
    "near_flip": true,
    "weekly_color": "green",
-   "agree": false,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
    "ticker": "GLD",
-   "margin_pct": 0.45,
+   "margin_pct": 0.37,
    "color": "green",
    "near_flip": false,
    "weekly_color": "red",
@@ -380,7 +380,7 @@
   },
   {
    "ticker": "GLTR",
-   "margin_pct": 0.45,
+   "margin_pct": 0.43,
    "color": "green",
    "near_flip": false,
    "weekly_color": "red",
@@ -389,7 +389,7 @@
   },
   {
    "ticker": "HYG",
-   "margin_pct": -0.09,
+   "margin_pct": -0.12,
    "color": "red",
    "near_flip": true,
    "weekly_color": "red",
@@ -398,7 +398,7 @@
   },
   {
    "ticker": "LQD",
-   "margin_pct": -0.2,
+   "margin_pct": -0.22,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -407,7 +407,7 @@
   },
   {
    "ticker": "BTCUSD",
-   "margin_pct": 1.66,
+   "margin_pct": 1.88,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -416,7 +416,7 @@
   },
   {
    "ticker": "EWJ",
-   "margin_pct": 0.26,
+   "margin_pct": 0.32,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -425,7 +425,7 @@
   },
   {
    "ticker": "VGK",
-   "margin_pct": -0.0,
+   "margin_pct": -0.07,
    "color": "red",
    "near_flip": true,
    "weekly_color": "green",
@@ -434,7 +434,7 @@
   },
   {
    "ticker": "IWM",
-   "margin_pct": -0.3,
+   "margin_pct": -0.4,
    "color": "red",
    "near_flip": false,
    "weekly_color": "green",
@@ -443,16 +443,16 @@
   },
   {
    "ticker": "IWF",
-   "margin_pct": -0.14,
-   "color": "red",
+   "margin_pct": 0.03,
+   "color": "green",
    "near_flip": true,
    "weekly_color": "green",
-   "agree": false,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
    "ticker": "IWD",
-   "margin_pct": 0.14,
+   "margin_pct": 0.06,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -461,16 +461,7 @@
   },
   {
    "ticker": "XLC",
-   "margin_pct": 0.08,
-   "color": "green",
-   "near_flip": true,
-   "weekly_color": "red",
-   "agree": false,
-   "est_flag": "parallel-validation"
-  },
-  {
-   "ticker": "XLF",
-   "margin_pct": 0.24,
+   "margin_pct": 0.2,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -478,8 +469,17 @@
    "est_flag": "parallel-validation"
   },
   {
+   "ticker": "XLF",
+   "margin_pct": -0.02,
+   "color": "red",
+   "near_flip": true,
+   "weekly_color": "green",
+   "agree": false,
+   "est_flag": "parallel-validation"
+  },
+  {
    "ticker": "XLV",
-   "margin_pct": 0.48,
+   "margin_pct": 0.41,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -488,7 +488,7 @@
   },
   {
    "ticker": "XLU",
-   "margin_pct": -0.55,
+   "margin_pct": -0.67,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -497,7 +497,7 @@
   },
   {
    "ticker": "XLRE",
-   "margin_pct": -0.38,
+   "margin_pct": -0.5,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -506,7 +506,7 @@
   },
   {
    "ticker": "XLE",
-   "margin_pct": 0.91,
+   "margin_pct": 0.67,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -515,16 +515,16 @@
   },
   {
    "ticker": "XLB",
-   "margin_pct": -0.07,
+   "margin_pct": -0.19,
    "color": "red",
-   "near_flip": true,
+   "near_flip": false,
    "weekly_color": "red",
    "agree": true,
    "est_flag": "parallel-validation"
   },
   {
    "ticker": "XLY",
-   "margin_pct": -0.34,
+   "margin_pct": -0.36,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -533,7 +533,7 @@
   },
   {
    "ticker": "GSPC",
-   "margin_pct": 0.0,
+   "margin_pct": 0.05,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -551,7 +551,7 @@
   },
   {
    "ticker": "URTH",
-   "margin_pct": 0.03,
+   "margin_pct": 0.06,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -560,7 +560,7 @@
   },
   {
    "ticker": "EFA",
-   "margin_pct": 0.07,
+   "margin_pct": 0.04,
    "color": "green",
    "near_flip": true,
    "weekly_color": "green",
@@ -569,7 +569,7 @@
   },
   {
    "ticker": "XLP",
-   "margin_pct": -0.13,
+   "margin_pct": -0.16,
    "color": "red",
    "near_flip": true,
    "weekly_color": "red",
@@ -578,7 +578,7 @@
   },
   {
    "ticker": "XLI",
-   "margin_pct": -0.45,
+   "margin_pct": -0.52,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -587,7 +587,7 @@
   },
   {
    "ticker": "XBI",
-   "margin_pct": 0.43,
+   "margin_pct": 0.28,
    "color": "green",
    "near_flip": false,
    "weekly_color": "green",
@@ -596,16 +596,16 @@
   },
   {
    "ticker": "UUP",
-   "margin_pct": -0.02,
-   "color": "red",
+   "margin_pct": 0.03,
+   "color": "green",
    "near_flip": true,
    "weekly_color": "green",
-   "agree": false,
+   "agree": true,
    "est_flag": "parallel-validation"
   },
   {
    "ticker": "TLT",
-   "margin_pct": -0.27,
+   "margin_pct": -0.29,
    "color": "red",
    "near_flip": false,
    "weekly_color": "red",
@@ -614,7 +614,7 @@
   },
   {
    "ticker": "VYM",
-   "margin_pct": -0.03,
+   "margin_pct": -0.16,
    "color": "red",
    "near_flip": true,
    "weekly_color": "green",
@@ -623,32 +623,32 @@
   },
   {
    "ticker": "IAI",
-   "margin_pct": 0.1,
-   "color": "green",
-   "near_flip": true,
+   "margin_pct": -0.19,
+   "color": "red",
+   "near_flip": false,
    "weekly_color": "green",
-   "agree": true,
+   "agree": false,
    "est_flag": "parallel-validation"
   }
  ],
  "vol": [
   {
    "index": "VIX",
-   "close": 14.81,
-   "pct_52w": 6.7,
-   "asof": "2026-09-18"
+   "close": 14.87,
+   "pct_52w": 8.3,
+   "asof": "2026-09-25"
   },
   {
    "index": "VXN",
-   "close": 19.29,
-   "pct_52w": 4.8,
-   "asof": "2026-09-18"
+   "close": 20.87,
+   "pct_52w": 23.4,
+   "asof": "2026-09-25"
   },
   {
    "index": "GVZ",
-   "close": 23.31,
-   "pct_52w": 18.3,
-   "asof": "2026-09-18"
+   "close": 22.44,
+   "pct_52w": 13.9,
+   "asof": "2026-09-25"
   },
   {
    "index": "RVX",
@@ -658,9 +658,9 @@
   },
   {
    "index": "OVX",
-   "close": 50.39,
-   "pct_52w": 51.2,
-   "asof": "2026-09-18"
+   "close": 55.09,
+   "pct_52w": 57.9,
+   "asof": "2026-09-25"
   },
   {
    "index": "VXEEM",
@@ -694,23 +694,23 @@
   },
   {
    "index": "VVIX",
-   "close": 87.38,
-   "pct_52w": 9.5,
-   "asof": "2026-09-18"
+   "close": 87.84,
+   "pct_52w": 12.7,
+   "asof": "2026-09-25"
   },
   {
    "index": "SKEW",
-   "close": 148.1,
-   "pct_52w": 74.6,
-   "asof": "2026-09-18"
+   "close": 144.91,
+   "pct_52w": 54.4,
+   "asof": "2026-09-25"
   }
  ],
  "put_call_equity": {
   "value": null,
   "asof": "2019-10-04",
-  "age_days": 2543,
+  "age_days": 2549,
   "series": "cboe_equity",
-  "status": "STALE_2543d_source_is_archive",
+  "status": "STALE_2549d_source_is_archive",
   "w5_avg": null
  }
 }

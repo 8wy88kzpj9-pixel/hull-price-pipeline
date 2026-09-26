@@ -41,7 +41,15 @@ USAGE
     python build_weekly.py            # normal run
     python build_weekly.py --dry-run  # validate only, write nothing
 
-v1.9: _j() sanitizer + allow_nan=False. hull3d เป็นบล็อกเดียวที่วนจาก DataFrame
+v2.3: AGG + DBC เข้า EXTRA_TICKERS สำหรับกลุ่ม "EPFR Flows" ใน tracker v2.18
+      AGG = US Aggregate -> EPFR "Bonds" (asset class) · DBC = ตะกร้า
+      commodity กว้างที่สุด -> EPFR "Commodities" · BIL (money-market) จงใจ
+      ไม่ใส่: T-bill ETF ไม่มีเทรนด์ให้ Hull อ่าน (ดอกเบี้ยสะสม + ราคาหล่น
+      ตอนจ่ายปันผล) · เพิ่ม SCRIPT_VERSION เขียนลง _status.json และ board.json
+      เพื่อให้ยืนยันได้จากข้อมูลว่า repo รันสคริปต์ตัวไหน ไม่ต้องนับบรรทัด
+      เทียบภาพอีก · แก้ป้าย changelog ที่ชนกัน (v1.9 สองรายการ) -> v2.2
+
+v2.2: _j() sanitizer + allow_nan=False. hull3d เป็นบล็อกเดียวที่วนจาก DataFrame
       โดยไม่มี pd.isna guard ทำให้ SETBK (^SET.BK ดึงไม่ได้ 2026-08-28) เขียน
       NaN ลง margin_pct/color/weekly_color — ไม่ใช่ JSON ที่ถูกต้อง JSON.parse()
       โยนทั้งไฟล์ ยังไม่มี consumer พังเพราะ tracker splice มือ ไม่ fetch แต่จะ
@@ -53,7 +61,11 @@ v1.8: drop_incomplete_week() — ตัดแท่งสัปดาห์ท�
       validate() จับไม่ได้เพราะ coverage ยังขึ้น 100% ทุก ticker มีค่าครบ
       แค่เป็นค่ากลางสัปดาห์ ยืนยันด้วยการวัดจริง 2026-08-07: INDA พลิก
       -0.05 -> +0.04 เพราะรันตอนตลาด US ยังไม่เปิด
-v2.1: SKEW + equity put/call ดึงจาก cdn.cboe.com โดยตรง (Cboe เป็นผู้คำนวณ\n      Yahoo แค่ mirror และขาดค่าวันศุกร์เป็นครั้งคราว) · drop_lagging_columns()\n      เขียน null แทนค่าวันก่อนหน้าเมื่อซีรีส์มาช้า · board.json รวมทุกอย่าง\n      ไว้ไฟล์เดียวสำหรับเสิร์ฟผ่าน GitHub Pages\nv1.9: vol_indices.csv rebuild เต็มไฟล์จากรายวัน 2y (idempotent) แทน upsert
+v2.1: SKEW + equity put/call ดึงจาก cdn.cboe.com โดยตรง (Cboe เป็นผู้คำนวณ
+      Yahoo แค่ mirror และขาดค่าวันศุกร์เป็นครั้งคราว) · drop_lagging_columns()
+      เขียน null แทนค่าวันก่อนหน้าเมื่อซีรีส์มาช้า · board.json รวมทุกอย่าง
+      ไว้ไฟล์เดียวสำหรับเสิร์ฟผ่าน GitHub Pages
+v1.9: vol_indices.csv rebuild เต็มไฟล์จากรายวัน 2y (idempotent) แทน upsert
       v1.6 เขียน snapshot long ทับประวัติ wide สำเร็จจริง 2026-08-07T01:50Z
       (f61ae7e) ประวัติตั้งแต่ 2025-05-16 หายเกลี้ยง rebuild กู้คืนได้เองโดย
       ไม่ต้องขุด git · เพิ่ม VVIX กลับเข้า VOL_INDICES (เคยอยู่ในไฟล์เดิมแต่
@@ -126,6 +138,7 @@ MAX_SOURCE_AGE_DAYS = 10 # ค่าที่เก่ากว่านี้ =
 # ด่านตรวจ "ค่า" จับ "ตัวตน" ไม่ได้ — ต้องตรวจวันที่ด้วยเสมอ
 # (รูปแบบเดียวกับเหตุการณ์ OAS ปีผิดที่ผ่าน hard-gate เพราะ HY > IG ยังเป็นจริง)
 
+SCRIPT_VERSION = "2.3"   # เขียนลง _status.json + board.json · ห้ามพิมพ์ซ้ำที่อื่น
 HISTORY = "3y"          # 3y of weekly bars ≈ 156 rows: ample for HMA55 warmup
 HMA_PERIOD = 55
 NEAR_FLIP_ABS = 0.30
@@ -193,7 +206,14 @@ VOL_HISTORY = "2y"      # v1.9: rebuild ประวัติ weekly ทั้�
 # XLP/XLI เป็น Select Sector SPDR ตระกูลเดียวกับ XLF/XLV/XLE ที่อยู่ในระบบแล้ว
 # ที่เหลือเป็น ETF ระดับ top-50 ของสหรัฐ — ถ้าตัวไหน Yahoo ไม่เสิร์ฟ จะโผล่ใน
 # missing_tickers และ validate-then-write จะรักษาไฟล์เดิมไว้ ไม่เสียหาย
-EXTRA_TICKERS = ["URTH", "EFA", "XLP", "XLI", "XBI", "UUP", "TLT", "VYM", "IAI"]
+# v2.3 (2026-09-20): สองตัวสำหรับแถว asset class ของตาราง EPFR
+#   AGG = iShares Core US Aggregate Bond -> EPFR "Bonds"
+#   DBC = Invesco DB Commodity Index     -> EPFR "Commodities"
+#   ไม่มี Cboe vol index สำหรับทั้งสองตัว · MOVE คือ Treasury vol และ OVX/GVZ
+#   คือน้ำมัน/ทอง — ใช้แทนไม่ได้ (protocol §6.2) IV30 ต้องมาจาก probe_iv
+#   BIL ไม่ใส่โดยตั้งใจ: T-bill ETF ไม่มีเทรนด์ให้ Hull อ่าน
+EXTRA_TICKERS = ["URTH", "EFA", "XLP", "XLI", "XBI", "UUP", "TLT", "VYM", "IAI",
+                 "AGG", "DBC"]
 
 SYMBOL_MAP = {
     "BTCUSD": "BTC-USD",
@@ -675,6 +695,7 @@ def write_board(rep: dict, hull_rows: list, h3: pd.DataFrame,
     board = {
         "asof": rep["asof"],
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "script_version": SCRIPT_VERSION,
         "coverage": rep["coverage"],
         "rows": rep["rows"],
         # ทุกบล็อกด้านล่างผ่าน _j() เหมือนกันหมด ไม่ใช่เฉพาะบล็อกที่เคยพัง
@@ -800,6 +821,7 @@ def main() -> None:
     STATUS.write_text(json.dumps({
         **rep,
         "run_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "script_version": SCRIPT_VERSION,
         "hull_nulls": [r["ticker"] for r in rows if r["color"] is None],
         "near_flips": near,
     }, indent=2))

@@ -1,11 +1,12 @@
 {
   "asof": "2026-09-25",
-  "coverage": 0.974,
+  "coverage": 0.976,
   "rows": 157,
   "missing_tickers": [
     "SETBK"
   ],
-  "run_utc": "2026-09-26T06:58:16+00:00",
+  "run_utc": "2026-09-26T07:25:27+00:00",
+  "script_version": "2.3",
   "hull_nulls": [
     "SETBK"
   ],
@@ -27,6 +28,7 @@
     "XLP -0.17",
     "XLI -0.26",
     "UUP +0.12",
-    "VYM +0.11"
+    "VYM +0.11",
+    "AGG -0.22"
   ]
 }

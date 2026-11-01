@@ -1,6 +1,6 @@
 {
  "asof": "2026-10-30",
- "generated_utc": "2026-10-31T07:55:22+00:00",
+ "generated_utc": "2026-11-01T13:10:10+00:00",
  "script_version": "2.3",
  "coverage": 0.976,
  "rows": 157,
@@ -105,8 +105,8 @@
   },
   {
    "ticker": "BTCUSD",
-   "close": 77180.2812,
-   "margin_pct": 1.66,
+   "close": 77835.6719,
+   "margin_pct": 1.68,
    "color": "green",
    "near_flip": false
   },
@@ -422,9 +422,9 @@
   },
   {
    "ticker": "BTCUSD",
-   "margin_pct": 0.22,
+   "margin_pct": 0.17,
    "color": "green",
-   "near_flip": false,
+   "near_flip": true,
    "weekly_color": "green",
    "agree": true,
    "est_flag": "parallel-validation"
@@ -741,9 +741,9 @@
  "put_call_equity": {
   "value": null,
   "asof": "2019-10-04",
-  "age_days": 2584,
+  "age_days": 2585,
   "series": "cboe_equity",
-  "status": "STALE_2584d_source_is_archive",
+  "status": "STALE_2585d_source_is_archive",
   "w5_avg": null
  }
 }

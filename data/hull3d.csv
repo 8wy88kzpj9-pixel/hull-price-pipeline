@@ -551,7 +551,6 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-11-07,BTCUSD,243,75747.5781,85818.1527,86012.5868,-0.23,red,False,parallel-validation,green,False
 2026-11-13,ACWI,167,156.1,160.127,160.6082,-0.3,red,False,parallel-validation,red,True
 2026-11-13,AGG,167,95.09,94.9894,95.0229,-0.04,red,True,parallel-validation,red,True
-2026-11-13,BTCUSD,243,68249.2734,84673.0625,85404.2809,-0.86,red,False,parallel-validation,green,False
 2026-11-13,DBC,167,30.79,33.4402,33.4219,0.05,green,True,parallel-validation,green,True
 2026-11-13,EEM,167,60.92,64.6544,65.1955,-0.83,red,False,parallel-validation,red,True
 2026-11-13,EFA,167,104.17,105.0215,105.2622,-0.23,red,False,parallel-validation,red,True
@@ -589,7 +588,9 @@ asof,ticker,bars_3d_used,close_3d,hma55_3d,hma55_3d_prev,margin_pct,color,near_f
 2026-11-13,XLU,167,44.04,41.2524,41.1598,0.22,green,False,parallel-validation,red,False
 2026-11-13,XLV,167,188.85,180.6713,179.3732,0.72,green,False,parallel-validation,green,True
 2026-11-13,XLY,167,119.98,113.528,113.1101,0.37,green,False,parallel-validation,green,True
+2026-11-14,BTCUSD,243,64128.0508,84353.8309,85326.3762,-1.14,red,False,parallel-validation,green,False
 ,SETBK,0,,,,,,,parallel-validation,green,
+,SETBK,0,,,,,,,parallel-validation,,
 ,SETBK,0,,,,,,,parallel-validation,,
 ,SETBK,0,,,,,,,parallel-validation,,
 ,SETBK,0,,,,,,,parallel-validation,,
